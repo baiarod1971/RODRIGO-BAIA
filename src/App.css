@@ -1,0 +1,110 @@
+/* ==========================================================================
+   App.css
+   Estilos globais da aplicação Agent Inbox e layout da página principal.
+   ========================================================================== */
+
+/* Reset básico e configuração da fonte padrão */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #f1f5f9;
+  color: #1e293b;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Container principal da aplicação */
+.app {
+  min-height: 100vh;
+}
+
+/* Cabeçalho do sistema Agent Inbox */
+.app__header {
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  color: #ffffff;
+  padding: 24px 32px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.app__header-conteudo {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.app__titulo {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 4px;
+  letter-spacing: -0.3px;
+}
+
+.app__subtitulo {
+  font-size: 14px;
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+/* Área principal com os cartões */
+.app__conteudo {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px;
+}
+
+/* Informações do painel */
+.app__painel-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+}
+
+.app__painel-titulo {
+  font-size: 18px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.app__painel-contador {
+  font-size: 13px;
+  color: #64748b;
+  background: #ffffff;
+  padding: 6px 14px;
+  border-radius: 20px;
+  border: 1px solid #e2e8f0;
+}
+
+/* Grid responsivo para os cartões de decisão */
+.app__grid-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 24px;
+}
+
+/* Responsividade para telas menores */
+@media (max-width: 480px) {
+  .app__grid-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .app__header {
+    padding: 16px 20px;
+  }
+
+  .app__conteudo {
+    padding: 20px 16px;
+  }
+
+  .app__painel-info {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}
