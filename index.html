@@ -1,12 +1,14 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Análise de Carteira - Portfolio Performance Dashboard</title>
+    <title>Portfolio Performance Dashboard - Carteira de Investimentos</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <style>
-        :root {
+        /* ========== DARK THEME (default) ========== */
+        :root, [data-theme="dark"] {
             --bg-primary: #0f172a;
             --bg-secondary: #1e293b;
             --bg-card: #1e293b;
@@ -23,35 +25,61 @@
             --accent-cyan: #06b6d4;
             --accent-pink: #ec4899;
             --accent-orange: #f97316;
+            --shadow: 0 4px 20px rgba(0,0,0,0.3);
+            --chart-grid: rgba(51,65,85,0.5);
+        }
+        /* ========== LIGHT THEME ========== */
+        [data-theme="light"] {
+            --bg-primary: #f1f5f9;
+            --bg-secondary: #e2e8f0;
+            --bg-card: #ffffff;
+            --bg-card-hover: #f8fafc;
+            --border: #cbd5e1;
+            --text-primary: #1e293b;
+            --text-secondary: #475569;
+            --text-muted: #94a3b8;
+            --accent-blue: #2563eb;
+            --accent-green: #059669;
+            --accent-red: #dc2626;
+            --accent-yellow: #d97706;
+            --accent-purple: #7c3aed;
+            --accent-cyan: #0891b2;
+            --accent-pink: #db2777;
+            --accent-orange: #ea580c;
+            --shadow: 0 4px 20px rgba(0,0,0,0.08);
+            --chart-grid: rgba(203,213,225,0.6);
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.5;
-            min-height: 100vh;
+            background: var(--bg-primary); color: var(--text-primary);
+            line-height: 1.5; min-height: 100vh; transition: background 0.3s, color 0.3s;
         }
         .container { max-width: 1440px; margin: 0 auto; padding: 20px; }
         .header {
             display: flex; justify-content: space-between; align-items: center;
-            padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 24px;
+            padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
         }
         .header h1 { font-size: 1.5rem; font-weight: 700; }
         .header .date { color: var(--text-secondary); font-size: 0.9rem; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+
+        /* Theme Toggle */
+        .theme-toggle {
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 24px;
+            padding: 6px 14px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+            font-size: 0.82rem; color: var(--text-secondary); transition: all 0.3s;
+        }
+        .theme-toggle:hover { border-color: var(--accent-blue); color: var(--text-primary); }
+        .theme-toggle .icon { font-size: 1.1rem; }
 
         /* KPI Cards */
-        .kpi-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px; margin-bottom: 24px;
-        }
+        .kpi-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px; }
         .kpi-card {
-            background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: 12px; padding: 20px;
+            background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px;
             transition: transform 0.2s, box-shadow 0.2s;
         }
-        .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+        .kpi-card:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
         .kpi-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
         .kpi-value { font-size: 1.5rem; font-weight: 700; }
         .kpi-sub { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; }
@@ -62,35 +90,27 @@
         /* Section */
         .section { margin-bottom: 28px; }
         .section-title {
-            font-size: 1.1rem; font-weight: 600; margin-bottom: 16px;
-            padding-bottom: 8px; border-bottom: 1px solid var(--border);
-            display: flex; align-items: center; gap: 8px;
+            font-size: 1.1rem; font-weight: 600; margin-bottom: 16px; padding-bottom: 8px;
+            border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px;
         }
-        .section-title .badge {
-            font-size: 0.7rem; background: var(--accent-blue); color: white;
-            padding: 2px 8px; border-radius: 20px; font-weight: 500;
-        }
+        .section-title .badge { font-size: 0.7rem; background: var(--accent-blue); color: white; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
 
-        /* Grid Layouts */
+        /* Grid */
         .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
         .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
         @media (max-width: 1024px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
 
         /* Cards */
-        .card {
-            background: var(--bg-card); border: 1px solid var(--border);
-            border-radius: 12px; padding: 20px; position: relative;
-        }
+        .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; position: relative; transition: background 0.3s; }
         .card-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 16px; color: var(--text-secondary); }
 
         /* Tables */
         .table-container { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
         table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
         thead th {
-            background: var(--bg-secondary); padding: 10px 12px; text-align: left;
-            font-weight: 600; color: var(--text-secondary); white-space: nowrap;
-            position: sticky; top: 0; z-index: 1; border-bottom: 2px solid var(--border);
-            cursor: pointer; user-select: none;
+            background: var(--bg-secondary); padding: 10px 12px; text-align: left; font-weight: 600;
+            color: var(--text-secondary); white-space: nowrap; position: sticky; top: 0; z-index: 1;
+            border-bottom: 2px solid var(--border); cursor: pointer; user-select: none;
         }
         thead th:hover { color: var(--text-primary); }
         tbody td { padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
@@ -104,83 +124,36 @@
         /* Tabs */
         .tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
         .tab {
-            padding: 8px 16px; border-radius: 8px; cursor: pointer;
-            font-size: 0.8rem; font-weight: 500; border: 1px solid var(--border);
-            background: transparent; color: var(--text-secondary); transition: all 0.2s;
+            padding: 8px 16px; border-radius: 8px; cursor: pointer; font-size: 0.8rem; font-weight: 500;
+            border: 1px solid var(--border); background: transparent; color: var(--text-secondary); transition: all 0.2s;
         }
         .tab:hover { background: var(--bg-card-hover); color: var(--text-primary); }
         .tab.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
 
-        /* Rebalancing */
-        .rebal-row {
-            display: grid; grid-template-columns: 180px 80px 80px 100px 1fr 100px;
-            gap: 12px; align-items: center; padding: 10px 0;
-            border-bottom: 1px solid var(--border);
-        }
-        .rebal-row.header { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; }
-        .rebal-input {
-            background: var(--bg-primary); border: 1px solid var(--border);
-            border-radius: 6px; padding: 6px 10px; color: var(--text-primary);
-            font-size: 0.85rem; width: 70px; text-align: right;
-        }
-        .rebal-input:focus { outline: none; border-color: var(--accent-blue); }
-        .rebal-bar { height: 8px; border-radius: 4px; background: var(--bg-primary); position: relative; }
-        .rebal-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
-        .rebal-diff { font-weight: 600; font-size: 0.85rem; }
-
         /* Insight Cards */
         .insight-card {
-            background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(139,92,246,0.1));
-            border: 1px solid rgba(59,130,246,0.3); border-radius: 12px;
-            padding: 16px; margin-bottom: 12px;
+            background: linear-gradient(135deg, rgba(59,130,246,0.08), rgba(139,92,246,0.08));
+            border: 1px solid rgba(59,130,246,0.2); border-radius: 12px; padding: 16px; margin-bottom: 12px;
         }
+        [data-theme="light"] .insight-card { background: linear-gradient(135deg, rgba(59,130,246,0.05), rgba(139,92,246,0.05)); }
         .insight-card h4 { font-size: 0.85rem; color: var(--accent-blue); margin-bottom: 6px; }
         .insight-card p { font-size: 0.82rem; color: var(--text-secondary); }
 
-        /* Tooltips */
-        .info-tip {
-            display: inline-block; width: 16px; height: 16px; border-radius: 50%;
-            background: var(--text-muted); color: var(--bg-primary); text-align: center;
-            font-size: 0.65rem; line-height: 16px; cursor: help; font-weight: 700;
-            margin-left: 6px; vertical-align: middle;
-        }
-        .info-tip:hover + .tooltip-text { display: block; }
-        .tooltip-text {
-            display: none; position: absolute; background: var(--bg-primary);
-            border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
-            font-size: 0.75rem; color: var(--text-secondary); z-index: 10;
-            max-width: 300px; box-shadow: 0 8px 25px rgba(0,0,0,0.4);
-        }
-
-        /* Chart containers */
+        /* Chart */
         .chart-container { position: relative; width: 100%; }
         .chart-container.pie { max-width: 350px; margin: 0 auto; }
-
-        /* Legend custom */
         .custom-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
         .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-secondary); }
         .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
 
-        /* Button */
-        .btn {
-            padding: 8px 20px; border-radius: 8px; font-size: 0.85rem; font-weight: 500;
-            cursor: pointer; border: none; transition: all 0.2s;
-        }
+        /* Buttons */
+        .btn { padding: 8px 20px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer; border: none; transition: all 0.2s; }
         .btn-primary { background: var(--accent-blue); color: white; }
         .btn-primary:hover { background: #2563eb; }
         .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
         .btn-outline:hover { background: var(--bg-card-hover); color: var(--text-primary); }
-
-        /* Scrollbar */
-        ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: var(--bg-primary); }
-        ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
-
-        /* Print */
-        @media print {
-            body { background: white; color: #1a1a1a; }
-            .card, .kpi-card { border: 1px solid #ddd; background: white; }
-        }
+        .btn-sm { padding: 5px 12px; font-size: 0.78rem; }
+        .btn-green { background: var(--accent-green); color: white; }
 
         /* Period selector */
         .period-selector { display: flex; gap: 4px; }
@@ -189,1166 +162,792 @@
             border: 1px solid var(--border); background: transparent; color: var(--text-secondary);
         }
         .period-btn.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
-
-        /* Highlight row */
-        .highlight-good { background: rgba(16,185,129,0.08) !important; }
-        .highlight-bad { background: rgba(239,68,68,0.08) !important; }
-
-        /* Waterfall bar */
-        .waterfall-positive { background: var(--accent-green); }
-        .waterfall-negative { background: var(--accent-red); }
-
         .flex-between { display: flex; justify-content: space-between; align-items: center; }
-        .gap-12 { gap: 12px; }
         .mb-8 { margin-bottom: 8px; }
         .mb-16 { margin-bottom: 16px; }
         .mt-16 { margin-top: 16px; }
+
+        /* Rebalancing */
+        .rebal-row { display: grid; grid-template-columns: 180px 80px 80px 80px 1fr 120px; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .rebal-row.header { font-weight: 600; color: var(--text-secondary); font-size: 0.75rem; text-transform: uppercase; }
+        .rebal-input {
+            background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px;
+            padding: 6px 10px; color: var(--text-primary); font-size: 0.85rem; width: 70px; text-align: right;
+        }
+        .rebal-input:focus { outline: none; border-color: var(--accent-blue); }
+        .rebal-bar { height: 8px; border-radius: 4px; background: var(--bg-primary); position: relative; }
+        .rebal-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+        .rebal-diff { font-weight: 600; font-size: 0.85rem; }
+
+        /* Upload Zone */
+        .upload-zone {
+            border: 2px dashed var(--border); border-radius: 16px; padding: 40px; text-align: center;
+            cursor: pointer; transition: all 0.3s; background: var(--bg-card);
+        }
+        .upload-zone:hover, .upload-zone.dragover { border-color: var(--accent-blue); background: rgba(59,130,246,0.05); }
+        .upload-zone .icon { font-size: 3rem; margin-bottom: 12px; }
+        .upload-zone h3 { font-size: 1rem; margin-bottom: 8px; }
+        .upload-zone p { font-size: 0.82rem; color: var(--text-muted); }
+        .upload-zone input[type="file"] { display: none; }
+        .upload-status { margin-top: 16px; padding: 12px; border-radius: 8px; font-size: 0.85rem; display: none; }
+        .upload-status.success { display: block; background: rgba(16,185,129,0.1); color: var(--accent-green); border: 1px solid rgba(16,185,129,0.3); }
+        .upload-status.error { display: block; background: rgba(239,68,68,0.1); color: var(--accent-red); border: 1px solid rgba(239,68,68,0.3); }
+        .upload-status.loading { display: block; background: rgba(59,130,246,0.1); color: var(--accent-blue); border: 1px solid rgba(59,130,246,0.3); }
+
+        /* CDI Curve */
+        .copom-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+        .copom-item { background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 10px; text-align: center; }
+        .copom-item label { font-size: 0.7rem; color: var(--text-muted); display: block; margin-bottom: 4px; }
+        .copom-item input {
+            width: 100%; background: transparent; border: 1px solid var(--border); border-radius: 4px;
+            padding: 4px; color: var(--text-primary); text-align: center; font-size: 0.85rem; font-weight: 600;
+        }
+        .copom-item input:focus { outline: none; border-color: var(--accent-blue); }
+
+        /* Strategy cards */
+        .strategy-card {
+            background: var(--bg-card); border: 2px solid var(--border); border-radius: 12px; padding: 16px;
+            cursor: pointer; transition: all 0.2s; text-align: center;
+        }
+        .strategy-card:hover { border-color: var(--accent-blue); }
+        .strategy-card.active { border-color: var(--accent-blue); background: rgba(59,130,246,0.08); }
+        .strategy-card h4 { font-size: 0.88rem; margin-bottom: 4px; }
+        .strategy-card p { font-size: 0.75rem; color: var(--text-muted); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+
+        @media (max-width: 768px) {
+            .rebal-row { grid-template-columns: 1fr 1fr; font-size: 0.8rem; }
+            .header { flex-direction: column; align-items: flex-start; }
+        }
+        @media print { body { background: white; color: #1a1a1a; } .card, .kpi-card { border: 1px solid #ddd; background: white; } }
     </style>
 </head>
 <body>
-    <div class="container">
-        <!-- Header -->
-        <div class="header">
-            <div>
-                <h1>Portfolio Performance Dashboard</h1>
-                <div style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">
-                    Itau Private Bank - Relatório de Performance (com gross up)
-                </div>
-            </div>
+<div class="container">
+    <!-- HEADER -->
+    <div class="header">
+        <div>
+            <h1>Portfolio Performance Dashboard</h1>
+            <div style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">Itau Private Bank - Relatorio de Performance (com gross up)</div>
+        </div>
+        <div class="header-right">
             <div style="text-align: right;">
-                <div class="date">Data de Referência: <strong>31/12/2025</strong></div>
+                <div class="date">Data de Referencia: <strong id="headerDate">31/12/2025</strong></div>
                 <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Metodologia: TWR (Time-Weighted Return)</div>
             </div>
-        </div>
-
-        <!-- KPI Cards -->
-        <div class="kpi-grid" id="kpi-grid"></div>
-
-        <!-- Insights -->
-        <div class="section" id="insights-section"></div>
-
-        <!-- Row 1: Allocation + Performance -->
-        <div class="grid-2 mb-16" id="row-charts">
-            <div class="card">
-                <div class="card-title">Alocação por Classe de Ativo</div>
-                <div class="chart-container pie">
-                    <canvas id="allocationChart"></canvas>
-                </div>
-                <div id="allocationLegend" class="custom-legend"></div>
-            </div>
-            <div class="card">
-                <div class="card-title flex-between">
-                    Rentabilidade por Classe de Ativo
-                    <div class="period-selector" id="classPeriodSelector"></div>
-                </div>
-                <div class="chart-container">
-                    <canvas id="classPerformanceChart"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- Row 2: Benchmark Comparison -->
-        <div class="section">
-            <div class="section-title">Comparação com Benchmarks</div>
-            <div class="grid-2">
-                <div class="card">
-                    <div class="card-title flex-between">
-                        Carteira vs Benchmarks por Período
-                        <div class="period-selector" id="benchPeriodSelector"></div>
-                    </div>
-                    <div class="chart-container">
-                        <canvas id="benchmarkChart"></canvas>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">Alpha sobre CDI (%) por Classe</div>
-                    <div class="chart-container">
-                        <canvas id="alphaChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Row 3: Benchmark Table -->
-        <div class="section">
-            <div class="card">
-                <div class="card-title">Tabela Comparativa de Rentabilidades (%)</div>
-                <div class="table-container" id="benchmarkTable"></div>
-            </div>
-        </div>
-
-        <!-- Row 4: Detailed Performance by Class -->
-        <div class="section">
-            <div class="section-title">
-                Performance Detalhada por Classe
-                <span class="badge">Gross Up</span>
-            </div>
-            <div class="card">
-                <div class="card-title flex-between">
-                    Rentabilidade dos Ativos
-                    <div class="period-selector" id="detailPeriodSelector"></div>
-                </div>
-                <div class="chart-container">
-                    <canvas id="assetDetailChart" height="400"></canvas>
-                </div>
-            </div>
-        </div>
-
-        <!-- Row 5: Full Assets Table -->
-        <div class="section">
-            <div class="section-title">Posição Detalhada dos Ativos</div>
-            <div class="tabs" id="classTabsContainer"></div>
-            <div class="card" style="padding: 0;">
-                <div class="table-container" style="max-height: 600px; overflow-y: auto;" id="assetsTableContainer"></div>
-            </div>
-        </div>
-
-        <!-- Row 6: Risk Metrics -->
-        <div class="section">
-            <div class="section-title">Métricas de Risco e Concentração</div>
-            <div class="grid-3" id="riskMetrics"></div>
-        </div>
-
-        <!-- Row 7: Rebalancing Tool -->
-        <div class="section">
-            <div class="section-title">Ferramenta de Rebalanceamento</div>
-            <div class="grid-2">
-                <div class="card">
-                    <div class="card-title">Definir Alocação Alvo (%)</div>
-                    <div id="rebalancingInputs"></div>
-                    <div style="margin-top: 16px; display: flex; gap: 8px;">
-                        <button class="btn btn-primary" onclick="calculateRebalancing()">Calcular Rebalanceamento</button>
-                        <button class="btn btn-outline" onclick="resetTargets()">Resetar</button>
-                    </div>
-                </div>
-                <div class="card">
-                    <div class="card-title">Movimentações Sugeridas</div>
-                    <div id="rebalancingResults">
-                        <p style="color: var(--text-muted); font-size: 0.85rem;">Defina as alocações alvo e clique em "Calcular Rebalanceamento"</p>
-                    </div>
-                    <div class="chart-container mt-16" style="max-height: 300px;">
-                        <canvas id="rebalanceChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Footer -->
-        <div style="text-align: center; padding: 30px 0; color: var(--text-muted); font-size: 0.75rem; border-top: 1px solid var(--border); margin-top: 20px;">
-            <p>Dashboard gerado a partir do relatório de performance do Itaú Private Bank (31/12/2025).</p>
-            <p>Rentabilidades com gross up: simulam IR de 15% sobre ativos isentos para comparabilidade.</p>
-            <p>Rentabilidade passada não representa garantia de resultados futuros.</p>
+            <button class="theme-toggle" onclick="toggleTheme()">
+                <span class="icon" id="themeIcon">&#9790;</span>
+                <span id="themeLabel">Claro</span>
+            </button>
         </div>
     </div>
 
-    <script>
-    // ==========================================
-    // DATA EXTRACTED FROM REPORT IMAGES
-    // ==========================================
+    <!-- KPI CARDS -->
+    <div class="kpi-grid" id="kpi-grid"></div>
 
-    const PORTFOLIO = {
-        dataRef: "31/12/2025",
-        metodologia: "TWR",
-        grossUp: true,
-        classes: [
-            {
-                nome: "Pós-fixado",
-                cor: "#3b82f6",
-                saldoBruto: 13281812.10,
-                ir: 1333376.31,
-                iof: 1600.84,
-                saldoLiquido: 11946834.95,
-                alocacao: 49.38,
-                rentab: { dez25: 1.35, nov25: 1.05, ano2025: 15.70, ano2024: 9.42, m6: 7.85, m12: 15.70 },
-                ativos: [
-                    { nome: "(53632) PRIVATE WEALTH IQ RF", codigo: "53632", emissor: "ITAU", tipo: "-", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: 1355943.51, quantidade: 71546.68, pu: 19.230843, saldoBruto: 1375903.01, ir: 3591.76, iof: 975.81, saldoLiquido: 1371335.44, aliqIR: null, dataInicio: "29/05/25", alocacao: 5.12, rentab: { dez25: 1.23, nov25: 1.03, ano2025: 8.64, ano2024: null, m6: 7.37, m12: null } },
-                    { nome: "(ISEN11) ISENTO MAR29CI", codigo: "ISEN11", emissor: "ITAUCOR", tipo: "-", indexador: "-", empresa: "ITAUCOR", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: 1249100.00, quantidade: 12491, pu: 108.42, saldoBruto: 1354274.22, ir: 0, iof: 0, saldoLiquido: 1354274.22, aliqIR: null, dataInicio: "05/06/25", alocacao: 5.03, rentab: { dez25: 1.59, nov25: 0.68, ano2025: 9.91, ano2024: null, m6: 8.25, m12: null } },
-                    { nome: "(KNUQ11) FII KINEA UNCI", codigo: "KNUQ11", emissor: "ITAUCOR", tipo: "-", indexador: "-", empresa: "ITAUCOR", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: 0, quantidade: 2954, pu: 105.25, saldoBruto: 310908.50, ir: 0, iof: 0, saldoLiquido: 310908.50, aliqIR: null, dataInicio: "13/03/24", alocacao: 1.16, rentab: { dez25: 2.88, nov25: 0.21, ano2025: 20.22, ano2024: 12.85, m6: 9.91, m12: 20.22 } },
-                    { nome: "CDB WILLCFI DI 119,00 05/2026", codigo: "CDB223KRV9K", emissor: "WILLCFI", tipo: "DI", indexador: "DI 119,00", empresa: "Itaú Corretora", regime: "-", emissao: "30/05/23", aplicacao: "30/05/2023", vencimento: "20/05/2026", valAplicado: 150000, quantidade: 150, pu: 1442.41163, saldoBruto: 216361.74, ir: 9954.26, iof: 0, saldoLiquido: 206407.48, aliqIR: 15, dataInicio: "13/03/24", alocacao: 0.80, rentab: { dez25: 1.45, nov25: 1.25, ano2025: 21.20, ano2024: 8.53, m6: 9.21, m12: 20.22 } },
-                    { nome: "CRI BROOKFIELD DI 1,50 01/2029", codigo: "24B0011201", emissor: "BROOKFIELD", tipo: "DI", indexador: "DI 1,50", empresa: "Itaú Corretora", regime: "-", emissao: "02/02/24", aplicacao: "02/02/2024", vencimento: "22/01/2029", valAplicado: 250000, quantidade: 250, pu: 998.421831, saldoBruto: 249605.45, ir: 0, iof: 0, saldoLiquido: 249605.45, aliqIR: null, dataInicio: "13/03/24", alocacao: 0.93, rentab: { dez25: 1.71, nov25: 1.59, ano2025: 18.49, ano2024: 13.12, m6: 9.25, m12: 18.49 } },
-                    { nome: "CRI ITAU DI 98,00 06/2027", codigo: "23F0013404", emissor: "ITAU", tipo: "DI", indexador: "DI 98,00", empresa: "Itaú Corretora", regime: "-", emissao: "19/06/23", aplicacao: "19/06/2023", vencimento: "21/06/2027", valAplicado: 1000000, quantidade: 1000, pu: 1006.62959, saldoBruto: 1006629.58, ir: 0, iof: 0, saldoLiquido: 1006629.58, aliqIR: null, dataInicio: "13/03/24", alocacao: 3.74, rentab: { dez25: 1.36, nov25: 1.27, ano2025: 16.60, ano2024: 10.45, m6: 8.24, m12: 16.60 } },
-                    { nome: "Itaú Prev High Yield II Mm Cp Pgbl", codigo: "4695", emissor: "ITAU", tipo: "-", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: null, quantidade: null, pu: 1.458579, saldoBruto: 1813421.57, ir: 494707.41, iof: 0, saldoLiquido: 1318714.16, aliqIR: null, dataInicio: "15/03/24", alocacao: 6.74, rentab: { dez25: 1.22, nov25: 1.01, ano2025: 14.49, ano2024: 8.64, m6: 7.08, m12: 14.49 } },
-                    { nome: "Itaú Privilege Rf Referenciado Di Pgbl", codigo: "4761", emissor: "ITAU", tipo: "-", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: null, quantidade: null, pu: 1.564462, saldoBruto: 1926830.24, ir: 606051.61, iof: 0, saldoLiquido: 1320778.63, aliqIR: null, dataInicio: "15/03/24", alocacao: 7.16, rentab: { dez25: 1.22, nov25: 1.03, ano2025: 14.34, ano2024: 8.52, m6: 7.37, m12: 14.34 } },
-                    { nome: "LCA-CDI ITAU 94,00 01/2028", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 94,00", empresa: "Tesouraria Itaú", regime: "-", emissao: "04/02/25", aplicacao: "04/02/2025", vencimento: "03/01/2028", valAplicado: 1422000, quantidade: 1422000, pu: 1.122303, saldoBruto: 1595915.13, ir: 0, iof: 0, saldoLiquido: 1595915.13, aliqIR: null, dataInicio: "04/02/25", alocacao: 5.93, rentab: { dez25: 1.35, nov25: 1.16, ano2025: 14.39, ano2024: null, m6: 8.20, m12: null } },
-                    { nome: "LCA-CDI ITAU 94,00 07/2028 (a)", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 94,00", empresa: "Tesouraria Itaú", regime: "-", emissao: "01/07/25", aplicacao: "01/07/2025", vencimento: "04/07/2028", valAplicado: 416955, quantidade: 416955, pu: 1.069119, saldoBruto: 445774.32, ir: 0, iof: 0, saldoLiquido: 445774.32, aliqIR: null, dataInicio: "01/07/25", alocacao: 1.66, rentab: { dez25: 1.35, nov25: 1.16, ano2025: 8.13, ano2024: null, m6: 8.13, m12: null } },
-                    { nome: "LCA-CDI ITAU 94,00 07/2028 (b)", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 94,00", empresa: "Tesouraria Itaú", regime: "-", emissao: "02/07/25", aplicacao: "02/07/2025", vencimento: "05/07/2028", valAplicado: 871000, quantidade: 871000, pu: 1.068565, saldoBruto: 930719.94, ir: 0, iof: 0, saldoLiquido: 930719.94, aliqIR: null, dataInicio: "02/07/25", alocacao: 3.46, rentab: { dez25: 1.35, nov25: 1.16, ano2025: 8.07, ano2024: null, m6: null, m12: null } },
-                    { nome: "LCI-CDI ITAU 94,00 04/2027", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 94,00", empresa: "Tesouraria Itaú", regime: "-", emissao: "03/04/25", aplicacao: "03/04/2025", vencimento: "05/04/2027", valAplicado: 44079, quantidade: 44079, pu: 1.101443, saldoBruto: 48550.50, ir: 0, iof: 0, saldoLiquido: 48550.50, aliqIR: null, dataInicio: "03/04/25", alocacao: 0.18, rentab: { dez25: 1.35, nov25: 1.16, ano2025: 11.93, ano2024: null, m6: 8.20, m12: null } },
-                    { nome: "LIG-DI ITAU CDI 101,00 08/2027", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 101,00", empresa: "Tesouraria Itaú", regime: "-", emissao: "04/06/24", aplicacao: "04/06/2024", vencimento: "23/08/2027", valAplicado: 404000.95, quantidade: 310000, pu: 1.583986, saldoBruto: 491035.76, ir: 0, iof: 0, saldoLiquido: 491035.76, aliqIR: null, dataInicio: "04/06/24", alocacao: 1.83, rentab: { dez25: 1.45, nov25: 1.25, ano2025: 17.02, ano2024: 7.27, m6: 8.82, m12: 17.02 } },
-                    { nome: "LIG-DI ITAU CDI 98,00 02/2029", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 98,00", empresa: "Tesouraria Itaú", regime: "-", emissao: "12/12/25", aplicacao: "12/12/2025", vencimento: "01/02/2029", valAplicado: 267000.10, quantidade: 198848, pu: 1.351466, saldoBruto: 268736.31, ir: 0, iof: 625.03, saldoLiquido: 268111.28, aliqIR: null, dataInicio: "12/12/25", alocacao: 1.00, rentab: { dez25: 0.76, nov25: null, ano2025: 0.76, ano2024: null, m6: null, m12: null } },
-                    { nome: "Private Prev Advanced Mm Cp Pgbl", codigo: "1040", emissor: "ITAU", tipo: "-", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: null, quantidade: null, pu: 1.448528, saldoBruto: 1247145.83, ir: 219071.27, iof: 0, saldoLiquido: 1028074.56, aliqIR: null, dataInicio: "08/04/24", alocacao: 4.64, rentab: { dez25: 1.22, nov25: 1.11, ano2025: 15.13, ano2024: 8.41, m6: 7.47, m12: 15.13 } }
-                ]
-            },
-            {
-                nome: "Prefixado",
-                cor: "#8b5cf6",
-                saldoBruto: 3918010.94,
-                ir: 3231.59,
-                iof: 0,
-                saldoLiquido: 3914779.35,
-                alocacao: 14.57,
-                rentab: { dez25: 0.48, nov25: 1.51, ano2025: 18.50, ano2024: 2.88, m6: 6.83, m12: 18.50 },
-                ativos: [
-                    { nome: "(56103) PRÉ 2028 IV INFRA", codigo: "56103", emissor: "ITAU", tipo: "PRE", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: 270000, quantidade: null, pu: 1.168487, saldoBruto: 314675.85, ir: 0, iof: 0, saldoLiquido: 314675.85, aliqIR: null, dataInicio: "08/07/24", alocacao: 1.17, rentab: { dez25: 0.18, nov25: 1.44, ano2025: 27.14, ano2024: -6.02, m6: 8.19, m12: 27.14 } },
-                    { nome: "(56934) PRÉ 2028 II", codigo: "56934", emissor: "ITAU", tipo: "PRE", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: 228000, quantidade: null, pu: 1.180103, saldoBruto: 268854.58, ir: 0, iof: 0, saldoLiquido: 268854.58, aliqIR: null, dataInicio: "24/04/24", alocacao: 1.00, rentab: { dez25: -0.02, nov25: 1.48, ano2025: 26.78, ano2024: -4.41, m6: 7.91, m12: 26.78 } },
-                    { nome: "(58441) DEB PRÉ 2030 SHIFT", codigo: "58441", emissor: "ITAU", tipo: "PRE", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: 300000, quantidade: null, pu: 1.024764, saldoBruto: 307287.84, ir: 0, iof: 0, saldoLiquido: 307287.84, aliqIR: null, dataInicio: "10/09/25", alocacao: 1.14, rentab: { dez25: -0.72, nov25: 2.22, ano2025: 2.86, ano2024: null, m6: null, m12: null } },
-                    { nome: "CRA BTG PACTUAL 11,96 09/2033", codigo: "CRA02300HWK", emissor: "BTG PACTUAL", tipo: "PRE", indexador: "PRE 11,96", empresa: "Itaú Corretora", regime: "-", emissao: "31/08/23", aplicacao: "31/08/2023", vencimento: "15/09/2033", valAplicado: 454000, quantidade: 454, pu: 988.559376, saldoBruto: 448805.95, ir: 0, iof: 0, saldoLiquido: 448805.95, aliqIR: null, dataInicio: "13/03/24", alocacao: 1.67, rentab: { dez25: -0.54, nov25: 4.06, ano2025: 33.28, ano2024: -13.04, m6: 7.84, m12: 33.28 } },
-                    { nome: "CRI ALLOS 11,67 04/2031", codigo: "24D0006603", emissor: "ALLOS", tipo: "PRE", indexador: "PRE 11,67", empresa: "Itaú Corretora", regime: "-", emissao: "15/04/24", aplicacao: "17/04/2024", vencimento: "15/04/2031", valAplicado: 300000, quantidade: 300, pu: 961.294872, saldoBruto: 288388.46, ir: 0, iof: 0, saldoLiquido: 288388.46, aliqIR: null, dataInicio: "17/04/24", alocacao: 1.07, rentab: { dez25: -0.53, nov25: 1.04, ano2025: 28.47, ano2024: 8.85, m6: 6.52, m12: 28.47 } },
-                    { nome: "LCA-PRE ITAU 12,55 06/2027", codigo: "-", emissor: "ITAU", tipo: "PRE", indexador: "PRE 12,55", empresa: "Tesouraria Itaú", regime: "-", emissao: null, aplicacao: "14/11/2024", vencimento: "16/06/2027", valAplicado: 250000, quantidade: 250000, pu: 1.140954, saldoBruto: 285238.49, ir: 0, iof: 0, saldoLiquido: 285238.49, aliqIR: null, dataInicio: "14/11/24", alocacao: 1.06, rentab: { dez25: 1.25, nov25: 1.06, ano2025: 14.58, ano2024: 1.79, m6: 7.14, m12: 14.58 } },
-                    { nome: "LCI-PRE ITAU 10,30 06/2026", codigo: "-", emissor: "ITAU", tipo: "PRE", indexador: "PRE 10,30", empresa: "Tesouraria Itaú", regime: "-", emissao: null, aplicacao: "14/06/2024", vencimento: "15/06/2026", valAplicado: 300000, quantidade: 300000, pu: 1.162929, saldoBruto: 348878.72, ir: 0, iof: 0, saldoLiquido: 348878.72, aliqIR: null, dataInicio: "14/06/24", alocacao: 1.30, rentab: { dez25: 1.05, nov25: 0.88, ano2025: 12.05, ano2024: 6.46, m6: 5.93, m12: 12.05 } },
-                    { nome: "LCI-PRE ITAU 12,03 10/2026", codigo: "-", emissor: "ITAU", tipo: "PRE", indexador: "PRE 12,03", empresa: "Tesouraria Itaú", regime: "-", emissao: null, aplicacao: "25/10/2024", vencimento: "26/10/2026", valAplicado: 300000, quantidade: 300000, pu: 1.142477, saldoBruto: 342743.18, ir: 0, iof: 0, saldoLiquido: 342743.18, aliqIR: null, dataInicio: "25/10/24", alocacao: 1.27, rentab: { dez25: 1.20, nov25: 1.02, ano2025: 14.01, ano2024: 4.66, m6: 6.87, m12: 14.01 } },
-                    { nome: "LCI-PRE ITAU 12,24 11/2026", codigo: "-", emissor: "ITAU", tipo: "PRE", indexador: "PRE 12,24", empresa: "Tesouraria Itaú", regime: "-", emissao: null, aplicacao: "04/11/2024", vencimento: null, valAplicado: 300000, quantidade: 300000, pu: 1.141613, saldoBruto: 342483.80, ir: 0, iof: 0, saldoLiquido: 342483.80, aliqIR: null, dataInicio: "04/11/24", alocacao: 1.27, rentab: { dez25: 1.27, nov25: 1.04, ano2025: 14.28, ano2024: 2.13, m6: 6.99, m12: 14.28 } }
-                ]
-            },
-            {
-                nome: "Outras Classes",
-                cor: "#64748b",
-                saldoBruto: null,
-                ir: null,
-                iof: null,
-                saldoLiquido: null,
-                alocacao: 36.05,
-                rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null },
-                ativos: [],
-                estimated: true
-            }
-        ]
-    };
+    <!-- INSIGHTS -->
+    <div class="section" id="insights-section"></div>
 
-    // Calculate estimated values for "Outras Classes"
-    (function() {
-        const totalBrutoEstimated = PORTFOLIO.classes[0].saldoBruto / (PORTFOLIO.classes[0].alocacao / 100);
-        const outras = PORTFOLIO.classes[2];
-        outras.saldoBruto = totalBrutoEstimated * (outras.alocacao / 100);
-        outras.saldoLiquido = outras.saldoBruto * 0.88;
-        outras.ir = outras.saldoBruto - outras.saldoLiquido;
-        outras.iof = 0;
-        PORTFOLIO.totalBruto = totalBrutoEstimated;
-        PORTFOLIO.totalLiquido = PORTFOLIO.classes.reduce((s, c) => s + (c.saldoLiquido || 0), 0);
-        PORTFOLIO.totalIR = PORTFOLIO.classes.reduce((s, c) => s + (c.ir || 0), 0);
-    })();
+    <!-- ROW: Allocation + Class Performance -->
+    <div class="grid-2 mb-16">
+        <div class="card">
+            <div class="card-title">Alocacao por Classe de Ativo</div>
+            <div class="chart-container pie"><canvas id="allocationChart"></canvas></div>
+            <div id="allocationLegend" class="custom-legend"></div>
+        </div>
+        <div class="card">
+            <div class="card-title flex-between">Rentabilidade por Classe de Ativo <div class="period-selector" id="classPeriodSelector"></div></div>
+            <div class="chart-container"><canvas id="classPerformanceChart"></canvas></div>
+        </div>
+    </div>
 
-    // Benchmarks (approximate values for the periods shown)
-    const BENCHMARKS = {
-        CDI:       { dez25: 1.12, nov25: 0.79, ano2025: 14.15, ano2024: 10.76, m6: 7.02, m12: 14.15, label: "CDI", cor: "#f59e0b" },
-        IPCA:      { dez25: 0.52, nov25: 0.39, ano2025: 4.83,  ano2024: 4.83,  m6: 2.80, m12: 4.83,  label: "IPCA", cor: "#ef4444" },
-        SELIC:     { dez25: 1.12, nov25: 0.79, ano2025: 14.25, ano2024: 10.87, m6: 7.10, m12: 14.25, label: "SELIC", cor: "#10b981" },
-        DOLAR:     { dez25: -1.5, nov25: 3.8,  ano2025: -8.00, ano2024: 27.34, m6: -6.0, m12: -8.00, label: "Dólar", cor: "#06b6d4" },
-        IBOVESPA:  { dez25: -4.3, nov25: -3.1, ano2025: 12.00, ano2024: -10.36,m6: 2.5,  m12: 12.00, label: "Ibovespa", cor: "#ec4899" },
-        IPCACDI:   { dez25: 1.64, nov25: 1.18, ano2025: 19.66, ano2024: 16.11, m6: 10.02,m12: 19.66, label: "IPCA+CDI", cor: "#f97316" }
-    };
-
-    const PERIODS = {
-        dez25: { label: "Dez/25", short: "Dez" },
-        nov25: { label: "Nov/25", short: "Nov" },
-        ano2025: { label: "Ano 2025", short: "2025" },
-        ano2024: { label: "Ano 2024", short: "2024" },
-        m6: { label: "6 Meses", short: "6M" },
-        m12: { label: "12 Meses", short: "12M" }
-    };
-
-    // ==========================================
-    // UTILITY FUNCTIONS
-    // ==========================================
-
-    function fmt(v, decimals = 2) {
-        if (v == null || isNaN(v)) return "-";
-        return v.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
-    }
-
-    function fmtBRL(v) {
-        if (v == null || isNaN(v)) return "-";
-        return "R$ " + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-    }
-
-    function fmtPct(v) {
-        if (v == null || isNaN(v)) return "-";
-        return fmt(v) + "%";
-    }
-
-    function colorClass(v) {
-        if (v == null || isNaN(v)) return "";
-        return v > 0 ? "positive" : v < 0 ? "negative" : "";
-    }
-
-    function getPortfolioWeightedReturn(period) {
-        let totalWeight = 0, weightedReturn = 0;
-        PORTFOLIO.classes.forEach(c => {
-            if (c.rentab[period] != null && !c.estimated) {
-                weightedReturn += c.rentab[period] * c.alocacao;
-                totalWeight += c.alocacao;
-            }
-        });
-        return totalWeight > 0 ? weightedReturn / totalWeight : null;
-    }
-
-    // ==========================================
-    // KPI CARDS
-    // ==========================================
-
-    function renderKPIs() {
-        const grid = document.getElementById('kpi-grid');
-        const portfolioReturn2025 = getPortfolioWeightedReturn('ano2025');
-        const portfolioReturnDez = getPortfolioWeightedReturn('dez25');
-        const alphaCDI2025 = portfolioReturn2025 != null ? portfolioReturn2025 - BENCHMARKS.CDI.ano2025 : null;
-        const alphaIPCA2025 = portfolioReturn2025 != null ? portfolioReturn2025 - BENCHMARKS.IPCA.ano2025 : null;
-
-        const kpis = [
-            { label: "Patrimônio Bruto", value: fmtBRL(PORTFOLIO.totalBruto), sub: `Líquido: ${fmtBRL(PORTFOLIO.totalLiquido)}`, cls: "neutral" },
-            { label: "Rentab. 2025 (Carteira)", value: fmtPct(portfolioReturn2025), sub: `CDI: ${fmtPct(BENCHMARKS.CDI.ano2025)}`, cls: colorClass(portfolioReturn2025) },
-            { label: "Rentab. Dez/25", value: fmtPct(portfolioReturnDez), sub: `CDI: ${fmtPct(BENCHMARKS.CDI.dez25)}`, cls: colorClass(portfolioReturnDez) },
-            { label: "Alpha vs CDI (2025)", value: fmtPct(alphaCDI2025), sub: alphaCDI2025 > 0 ? "Acima do CDI" : "Abaixo do CDI", cls: colorClass(alphaCDI2025) },
-            { label: "Retorno Real (vs IPCA)", value: fmtPct(alphaIPCA2025), sub: `IPCA 2025: ${fmtPct(BENCHMARKS.IPCA.ano2025)}`, cls: colorClass(alphaIPCA2025) },
-            { label: "IR + IOF Total", value: fmtBRL(PORTFOLIO.totalIR + (PORTFOLIO.classes.reduce((s, c) => s + (c.iof || 0), 0))), sub: `${fmt(((PORTFOLIO.totalIR) / PORTFOLIO.totalBruto) * 100)}% do bruto`, cls: "negative" }
-        ];
-
-        grid.innerHTML = kpis.map(k => `
-            <div class="kpi-card">
-                <div class="kpi-label">${k.label}</div>
-                <div class="kpi-value ${k.cls}">${k.value}</div>
-                <div class="kpi-sub">${k.sub}</div>
+    <!-- ROW: Benchmark Comparison -->
+    <div class="section">
+        <div class="section-title">Comparacao com Benchmarks</div>
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title flex-between">Carteira vs Benchmarks por Periodo <div class="period-selector" id="benchPeriodSelector"></div></div>
+                <div class="chart-container"><canvas id="benchmarkChart"></canvas></div>
             </div>
-        `).join('');
-    }
+            <div class="card">
+                <div class="card-title">Alpha sobre CDI (%) por Classe</div>
+                <div class="chart-container"><canvas id="alphaChart"></canvas></div>
+            </div>
+        </div>
+    </div>
 
-    // ==========================================
-    // INSIGHTS
-    // ==========================================
+    <!-- Benchmark Table -->
+    <div class="section">
+        <div class="card">
+            <div class="card-title">Tabela Comparativa de Rentabilidades (%)</div>
+            <div class="table-container" id="benchmarkTable"></div>
+        </div>
+    </div>
 
-    function renderInsights() {
-        const container = document.getElementById('insights-section');
-        const insights = [];
+    <!-- Asset Detail Chart -->
+    <div class="section">
+        <div class="section-title">Performance Detalhada por Classe <span class="badge">Gross Up</span></div>
+        <div class="card">
+            <div class="card-title flex-between">Rentabilidade dos Ativos <div class="period-selector" id="detailPeriodSelector"></div></div>
+            <div class="chart-container"><canvas id="assetDetailChart" height="400"></canvas></div>
+        </div>
+    </div>
 
-        // Concentration
-        const topAssets = [];
-        PORTFOLIO.classes.filter(c => !c.estimated).forEach(c => {
-            c.ativos.forEach(a => topAssets.push({ nome: a.nome, alocacao: a.alocacao, saldoBruto: a.saldoBruto }));
-        });
-        topAssets.sort((a, b) => b.alocacao - a.alocacao);
-        const top5Pct = topAssets.slice(0, 5).reduce((s, a) => s + a.alocacao, 0);
-        insights.push({
-            title: "Concentração",
-            text: `Os 5 maiores ativos representam ${fmt(top5Pct)}% da carteira. ${top5Pct > 30 ? "Considere diversificar para reduzir risco de concentração." : "Boa diversificação."} Destaque: ${topAssets[0].nome} (${fmt(topAssets[0].alocacao)}%)`
-        });
+    <!-- Assets Table -->
+    <div class="section">
+        <div class="section-title">Posicao Detalhada dos Ativos</div>
+        <div class="tabs" id="classTabsContainer"></div>
+        <div class="card" style="padding:0;"><div class="table-container" style="max-height:600px;overflow-y:auto;" id="assetsTableContainer"></div></div>
+    </div>
 
-        // Pós vs Pré
-        const posFixado = PORTFOLIO.classes[0];
-        const preFixado = PORTFOLIO.classes[1];
-        if (preFixado.rentab.ano2025 > posFixado.rentab.ano2025) {
-            insights.push({
-                title: "Prefixado superou Pós-fixado em 2025",
-                text: `Prefixado rendeu ${fmtPct(preFixado.rentab.ano2025)} vs ${fmtPct(posFixado.rentab.ano2025)} do Pós-fixado. O fechamento de taxa beneficiou os prefixados. Com SELIC alta, prefixados longos podem continuar voláteis.`
-            });
-        }
+    <!-- Risk Metrics -->
+    <div class="section">
+        <div class="section-title">Metricas de Risco e Concentracao</div>
+        <div class="grid-3" id="riskMetrics"></div>
+    </div>
 
-        // CRA BTG check
-        const craBtg = preFixado.ativos.find(a => a.nome.includes("BTG"));
-        if (craBtg && craBtg.rentab.ano2024 < 0) {
-            insights.push({
-                title: "Atenção: Volatilidade no CRA BTG PACTUAL",
-                text: `CRA BTG PACTUAL teve ${fmtPct(craBtg.rentab.ano2024)} em 2024 (marcação a mercado negativa), mas se recuperou fortemente em 2025 (${fmtPct(craBtg.rentab.ano2025)}). Ativo longo (vencimento 2033) com alta duration - espere volatilidade.`
-            });
-        }
+    <!-- CDI YIELD CURVE ANALYSIS (NEW) -->
+    <div class="section">
+        <div class="section-title">Analise da Curva de Juros (CDI) <span class="badge">Novo</span></div>
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title">Projecao SELIC - Reunioes COPOM 2025/2026</div>
+                <p style="font-size:0.78rem;color:var(--text-muted);margin-bottom:12px;">Edite as projecoes de SELIC para cada reuniao do COPOM. O grafico e as sugestoes serao atualizados automaticamente.</p>
+                <div class="copom-grid" id="copomGrid"></div>
+                <div style="margin-top:12px;"><button class="btn btn-primary btn-sm" onclick="updateCdiCurve()">Atualizar Projecao</button> <button class="btn btn-outline btn-sm" onclick="resetCdiCurve()">Resetar</button></div>
+            </div>
+            <div class="card">
+                <div class="card-title">Curva de Juros Projetada</div>
+                <div class="chart-container"><canvas id="cdiCurveChart"></canvas></div>
+            </div>
+        </div>
+        <div class="card mt-16">
+            <div class="card-title">Impacto da Curva de Juros por Classe de Ativo</div>
+            <div id="cdiImpactAnalysis"></div>
+        </div>
+    </div>
 
-        // Previdência
-        const prevAtivos = posFixado.ativos.filter(a => a.nome.toLowerCase().includes('prev') || a.nome.toLowerCase().includes('pgbl'));
-        const prevTotal = prevAtivos.reduce((s, a) => s + a.alocacao, 0);
-        const prevIR = prevAtivos.reduce((s, a) => s + (a.ir || 0), 0);
-        if (prevTotal > 0) {
-            insights.push({
-                title: "Previdência: Diferimento Fiscal",
-                text: `Ativos de previdência representam ${fmt(prevTotal)}% da carteira com IR diferido de ${fmtBRL(prevIR)}. O IR sobre PGBL/VGBL incide no resgate - considere o regime tributário (regressivo vs progressivo) no planejamento.`
-            });
-        }
-
-        // Tax-exempt products
-        const taxExemptTypes = ['LCA', 'LCI', 'LIG', 'CRI', 'CRA'];
-        const exemptAtivos = [];
-        PORTFOLIO.classes.filter(c => !c.estimated).forEach(c => {
-            c.ativos.forEach(a => {
-                if (taxExemptTypes.some(t => a.nome.toUpperCase().includes(t)) || a.nome.includes('FII') || a.nome.includes('INFRA')) {
-                    exemptAtivos.push(a);
-                }
-            });
-        });
-        const exemptPct = exemptAtivos.reduce((s, a) => s + a.alocacao, 0);
-        insights.push({
-            title: "Ativos Isentos de IR",
-            text: `${fmt(exemptPct)}% da carteira está em produtos isentos de IR (LCA, LCI, LIG, CRI, CRA, FII, Infra). O relatório aplica "gross up" de 15% para comparabilidade. Retornos reais desses ativos são superiores aos mostrados.`
-        });
-
-        container.innerHTML = `
-            <div class="section-title">Insights da Carteira</div>
-            <div class="grid-2">${insights.map(i => `
-                <div class="insight-card">
-                    <h4>${i.title}</h4>
-                    <p>${i.text}</p>
+    <!-- SMART REBALANCING (NEW) -->
+    <div class="section">
+        <div class="section-title">Rebalanceamento Inteligente <span class="badge">Novo</span></div>
+        <!-- Strategy Selection -->
+        <div class="card mb-16">
+            <div class="card-title">Selecione a Estrategia de Rebalanceamento</div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;" id="strategyCards"></div>
+        </div>
+        <div class="grid-2">
+            <div class="card">
+                <div class="card-title">Definir Alocacao Alvo (%)</div>
+                <div id="rebalancingInputs"></div>
+                <div style="margin-top:16px;display:flex;gap:8px;flex-wrap:wrap;">
+                    <button class="btn btn-primary" onclick="calculateRebalancing()">Calcular Rebalanceamento</button>
+                    <button class="btn btn-outline" onclick="resetTargets()">Resetar</button>
+                    <button class="btn btn-green btn-sm" onclick="applyStrategyTargets()">Aplicar Estrategia</button>
                 </div>
-            `).join('')}</div>
-        `;
-    }
-
-    // ==========================================
-    // ALLOCATION CHART
-    // ==========================================
-
-    let allocationChart;
-    function createAllocationChart() {
-        const ctx = document.getElementById('allocationChart').getContext('2d');
-        const classes = PORTFOLIO.classes;
-        const colors = classes.map(c => c.cor);
-
-        allocationChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: classes.map(c => c.nome),
-                datasets: [{
-                    data: classes.map(c => c.alocacao),
-                    backgroundColor: colors,
-                    borderColor: '#1e293b',
-                    borderWidth: 3,
-                    hoverOffset: 8
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                cutout: '65%',
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: ctx => {
-                                const c = classes[ctx.dataIndex];
-                                return [
-                                    `${c.nome}: ${fmt(c.alocacao)}%`,
-                                    `Saldo Bruto: ${fmtBRL(c.saldoBruto)}`,
-                                    c.saldoLiquido ? `Saldo Líquido: ${fmtBRL(c.saldoLiquido)}` : ''
-                                ].filter(Boolean);
-                            }
-                        }
-                    }
-                }
-            }
-        });
-
-        // Legend
-        const legend = document.getElementById('allocationLegend');
-        legend.innerHTML = classes.map(c => `
-            <div class="legend-item">
-                <div class="legend-dot" style="background: ${c.cor}"></div>
-                <span>${c.nome}: <strong>${fmt(c.alocacao)}%</strong>
-                ${c.saldoLiquido ? ` (${fmtBRL(c.saldoLiquido)})` : ' (dados não disponíveis)'}
-                </span>
             </div>
-        `).join('');
-    }
+            <div class="card">
+                <div class="card-title">Movimentacoes Sugeridas</div>
+                <div id="rebalancingResults"><p style="color:var(--text-muted);font-size:0.85rem;">Defina as alocacoes alvo e clique em "Calcular Rebalanceamento"</p></div>
+                <div class="chart-container mt-16" style="max-height:300px;"><canvas id="rebalanceChart"></canvas></div>
+            </div>
+        </div>
+        <!-- Maturity Calendar -->
+        <div class="card mt-16">
+            <div class="card-title">Calendario de Vencimentos e Oportunidades de Reinvestimento</div>
+            <div id="maturityCalendar"></div>
+        </div>
+    </div>
 
-    // ==========================================
-    // CLASS PERFORMANCE CHART
-    // ==========================================
+    <!-- UPLOAD SECTION (NEW) -->
+    <div class="section">
+        <div class="section-title">Upload de Relatorio <span class="badge">Novo</span></div>
+        <div class="card">
+            <div class="upload-zone" id="uploadZone">
+                <div class="icon">&#128196;</div>
+                <h3>Arraste o arquivo Excel aqui ou clique para selecionar</h3>
+                <p>Formatos aceitos: .xlsx, .xls (Relatorio Itau Private Bank / Personnalite)</p>
+                <p style="margin-top:8px;font-size:0.75rem;">Aba esperada: "Classe de ativo - com gross up" ou primeira aba disponivel</p>
+                <input type="file" id="fileInput" accept=".xlsx,.xls">
+            </div>
+            <div class="upload-status" id="uploadStatus"></div>
+            <div id="uploadPreview" style="margin-top:16px;"></div>
+        </div>
+    </div>
 
-    let classPerformanceChart;
-    let selectedClassPeriod = 'ano2025';
+    <!-- FOOTER -->
+    <div style="text-align:center;padding:30px 0;color:var(--text-muted);font-size:0.75rem;border-top:1px solid var(--border);margin-top:20px;">
+        <p>Dashboard gerado a partir do relatorio de performance do Itau Private Bank (31/12/2025).</p>
+        <p>Rentabilidades com gross up: simulam IR de 15% sobre ativos isentos para comparabilidade.</p>
+        <p>Rentabilidade passada nao representa garantia de resultados futuros.</p>
+    </div>
+</div>
 
-    function createClassPerformanceChart() {
-        const ctx = document.getElementById('classPerformanceChart').getContext('2d');
-        const classes = PORTFOLIO.classes.filter(c => !c.estimated);
-
-        classPerformanceChart = new Chart(ctx, {
-            type: 'bar',
-            data: getClassPerformanceData(selectedClassPeriod),
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                indexAxis: 'y',
-                plugins: {
-                    legend: { display: true, position: 'top', labels: { color: '#94a3b8', font: { size: 11 } } },
-                    tooltip: {
-                        callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.raw)}%` }
-                    }
-                },
-                scales: {
-                    x: {
-                        grid: { color: 'rgba(51,65,85,0.5)' },
-                        ticks: { color: '#94a3b8', callback: v => v + '%' }
-                    },
-                    y: {
-                        grid: { display: false },
-                        ticks: { color: '#f1f5f9', font: { size: 11 } }
-                    }
-                }
-            }
-        });
-
-        renderPeriodSelector('classPeriodSelector', selectedClassPeriod, (period) => {
-            selectedClassPeriod = period;
-            classPerformanceChart.data = getClassPerformanceData(period);
-            classPerformanceChart.update();
-        });
-    }
-
-    function getClassPerformanceData(period) {
-        const classes = PORTFOLIO.classes.filter(c => !c.estimated);
-        return {
-            labels: classes.map(c => c.nome),
-            datasets: [
-                {
-                    label: 'Classe',
-                    data: classes.map(c => c.rentab[period]),
-                    backgroundColor: classes.map(c => c.cor),
-                    borderRadius: 4
-                },
-                {
-                    label: 'CDI',
-                    data: classes.map(() => BENCHMARKS.CDI[period]),
-                    backgroundColor: 'rgba(245,158,11,0.6)',
-                    borderRadius: 4
-                }
+<script>
+// ==========================================
+// DATA - Extracted from Report Images
+// ==========================================
+const PORTFOLIO = {
+    dataRef: "31/12/2025",
+    classes: [
+        {
+            nome: "Pos-fixado", cor: "#3b82f6",
+            saldoBruto: 13281812.10, ir: 1333376.31, iof: 1600.84, saldoLiquido: 11946834.95, alocacao: 49.38,
+            rentab: { dez25: 1.35, nov25: 1.05, ano2025: 15.70, ano2024: 9.42, m6: 7.85, m12: 15.70 },
+            ativos: [
+                { nome: "(53632) PRIVATE WEALTH IQ RF", codigo: "53632", emissor: "ITAU", tipo: "-", indexador: "-", empresa: "Solucoes Investimentos Itau", valAplicado: 1355943.51, saldoBruto: 1375903.01, ir: 3591.76, iof: 975.81, saldoLiquido: 1371335.44, alocacao: 5.12, vencimento: null, dataInicio: "29/05/25", rentab: { dez25: 1.23, nov25: 1.03, ano2025: 8.64, ano2024: null, m6: 7.37, m12: null } },
+                { nome: "(ISEN11) ISENTO MAR29CI", codigo: "ISEN11", emissor: "ITAUCOR", tipo: "FIC FIIF Infra", indexador: "-", empresa: "ITAUCOR", valAplicado: 1249100.00, saldoBruto: 1354274.22, ir: 0, iof: 0, saldoLiquido: 1354274.22, alocacao: 5.03, vencimento: null, dataInicio: "05/06/25", rentab: { dez25: 1.59, nov25: 0.68, ano2025: 9.91, ano2024: null, m6: 8.25, m12: null } },
+                { nome: "(KNUQ11) FII KINEA UNCI", codigo: "KNUQ11", emissor: "ITAUCOR", tipo: "FII", indexador: "-", empresa: "ITAUCOR", valAplicado: 0, saldoBruto: 310908.50, ir: 0, iof: 0, saldoLiquido: 310908.50, alocacao: 1.16, vencimento: null, dataInicio: "13/03/24", rentab: { dez25: 2.88, nov25: 0.21, ano2025: 20.22, ano2024: 12.85, m6: 9.91, m12: 20.22 } },
+                { nome: "CDB WILLCFI DI 119,00 05/2026", codigo: "CDB223KRV9K", emissor: "WILLCFI", tipo: "DI", indexador: "DI 119,00", empresa: "Itau Corretora", valAplicado: 150000, saldoBruto: 216361.74, ir: 9954.26, iof: 0, saldoLiquido: 206407.48, alocacao: 0.80, vencimento: "20/05/2026", dataInicio: "13/03/24", rentab: { dez25: 1.45, nov25: 1.25, ano2025: 21.20, ano2024: 8.53, m6: 9.21, m12: 20.22 } },
+                { nome: "CRI BROOKFIELD DI 1,50", codigo: "24B0011201", emissor: "BROOKFIELD", tipo: "DI", indexador: "DI 1,50", empresa: "Itau Corretora", valAplicado: 250000, saldoBruto: 249605.45, ir: 0, iof: 0, saldoLiquido: 249605.45, alocacao: 0.93, vencimento: "22/01/2029", dataInicio: "13/03/24", rentab: { dez25: 1.71, nov25: 1.59, ano2025: 18.49, ano2024: 13.12, m6: 9.25, m12: 18.49 } },
+                { nome: "CRI ITAU DI 98,00 06/2027", codigo: "23F0013404", emissor: "ITAU", tipo: "DI", indexador: "DI 98,00", empresa: "Itau Corretora", valAplicado: 1000000, saldoBruto: 1006629.58, ir: 0, iof: 0, saldoLiquido: 1006629.58, alocacao: 3.74, vencimento: "21/06/2027", dataInicio: "13/03/24", rentab: { dez25: 1.36, nov25: 1.27, ano2025: 16.60, ano2024: 10.45, m6: 8.24, m12: 16.60 } },
+                { nome: "Itau Prev High Yield II PGBL", codigo: "4695", emissor: "ITAU", tipo: "Previdencia", indexador: "-", empresa: "Solucoes Inv Itau", valAplicado: null, saldoBruto: 1813421.57, ir: 494707.41, iof: 0, saldoLiquido: 1318714.16, alocacao: 6.74, vencimento: null, dataInicio: "15/03/24", rentab: { dez25: 1.22, nov25: 1.01, ano2025: 14.49, ano2024: 8.64, m6: 7.08, m12: 14.49 } },
+                { nome: "Itau Privilege Rf Ref Di PGBL", codigo: "4761", emissor: "ITAU", tipo: "Previdencia", indexador: "-", empresa: "Solucoes Inv Itau", valAplicado: null, saldoBruto: 1926830.24, ir: 606051.61, iof: 0, saldoLiquido: 1320778.63, alocacao: 7.16, vencimento: null, dataInicio: "15/03/24", rentab: { dez25: 1.22, nov25: 1.03, ano2025: 14.34, ano2024: 8.52, m6: 7.37, m12: 14.34 } },
+                { nome: "LCA-CDI ITAU 94,00 01/2028", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 94,00", empresa: "Tesouraria Itau", valAplicado: 1422000, saldoBruto: 1595915.13, ir: 0, iof: 0, saldoLiquido: 1595915.13, alocacao: 5.93, vencimento: "03/01/2028", dataInicio: "04/02/25", rentab: { dez25: 1.35, nov25: 1.16, ano2025: 14.39, ano2024: null, m6: 8.20, m12: null } },
+                { nome: "LCA-CDI ITAU 94,00 07/2028 (a)", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 94,00", empresa: "Tesouraria Itau", valAplicado: 416955, saldoBruto: 445774.32, ir: 0, iof: 0, saldoLiquido: 445774.32, alocacao: 1.66, vencimento: "04/07/2028", dataInicio: "01/07/25", rentab: { dez25: 1.35, nov25: 1.16, ano2025: 8.13, ano2024: null, m6: 8.13, m12: null } },
+                { nome: "LCA-CDI ITAU 94,00 07/2028 (b)", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 94,00", empresa: "Tesouraria Itau", valAplicado: 871000, saldoBruto: 930719.94, ir: 0, iof: 0, saldoLiquido: 930719.94, alocacao: 3.46, vencimento: "05/07/2028", dataInicio: "02/07/25", rentab: { dez25: 1.35, nov25: 1.16, ano2025: 8.07, ano2024: null, m6: null, m12: null } },
+                { nome: "LCI-CDI ITAU 94,00 04/2027", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 94,00", empresa: "Tesouraria Itau", valAplicado: 44079, saldoBruto: 48550.50, ir: 0, iof: 0, saldoLiquido: 48550.50, alocacao: 0.18, vencimento: "05/04/2027", dataInicio: "03/04/25", rentab: { dez25: 1.35, nov25: 1.16, ano2025: 11.93, ano2024: null, m6: 8.20, m12: null } },
+                { nome: "LIG-DI ITAU CDI 101,00 08/2027", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 101,00", empresa: "Tesouraria Itau", valAplicado: 404000.95, saldoBruto: 491035.76, ir: 0, iof: 0, saldoLiquido: 491035.76, alocacao: 1.83, vencimento: "23/08/2027", dataInicio: "04/06/24", rentab: { dez25: 1.45, nov25: 1.25, ano2025: 17.02, ano2024: 7.27, m6: 8.82, m12: 17.02 } },
+                { nome: "LIG-DI ITAU CDI 98,00 02/2029", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 98,00", empresa: "Tesouraria Itau", valAplicado: 267000.10, saldoBruto: 268736.31, ir: 0, iof: 625.03, saldoLiquido: 268111.28, alocacao: 1.00, vencimento: "01/02/2029", dataInicio: "12/12/25", rentab: { dez25: 0.76, nov25: null, ano2025: 0.76, ano2024: null, m6: null, m12: null } },
+                { nome: "Private Prev Advanced Mm PGBL", codigo: "1040", emissor: "ITAU", tipo: "Previdencia", indexador: "-", empresa: "Solucoes Inv Itau", valAplicado: null, saldoBruto: 1247145.83, ir: 219071.27, iof: 0, saldoLiquido: 1028074.56, alocacao: 4.64, vencimento: null, dataInicio: "08/04/24", rentab: { dez25: 1.22, nov25: 1.11, ano2025: 15.13, ano2024: 8.41, m6: 7.47, m12: 15.13 } }
             ]
-        };
-    }
+        },
+        {
+            nome: "Prefixado", cor: "#8b5cf6",
+            saldoBruto: 3918010.94, ir: 3231.59, iof: 0, saldoLiquido: 3914779.35, alocacao: 14.57,
+            rentab: { dez25: 0.48, nov25: 1.51, ano2025: 18.50, ano2024: 2.88, m6: 6.83, m12: 18.50 },
+            ativos: [
+                { nome: "(56103) PRE 2028 IV INFRA", codigo: "56103", emissor: "ITAU", tipo: "Deb Infra", indexador: "PRE", empresa: "Solucoes Inv Itau", valAplicado: 270000, saldoBruto: 314675.85, ir: 0, iof: 0, saldoLiquido: 314675.85, alocacao: 1.17, vencimento: null, dataInicio: "08/07/24", rentab: { dez25: 0.18, nov25: 1.44, ano2025: 27.14, ano2024: -6.02, m6: 8.19, m12: 27.14 } },
+                { nome: "(56934) PRE 2028 II", codigo: "56934", emissor: "ITAU", tipo: "Debenture", indexador: "PRE", empresa: "Solucoes Inv Itau", valAplicado: 228000, saldoBruto: 268854.58, ir: 0, iof: 0, saldoLiquido: 268854.58, alocacao: 1.00, vencimento: null, dataInicio: "24/04/24", rentab: { dez25: -0.02, nov25: 1.48, ano2025: 26.78, ano2024: -4.41, m6: 7.91, m12: 26.78 } },
+                { nome: "(58441) DEB PRE 2030 SHIFT", codigo: "58441", emissor: "ITAU", tipo: "Debenture", indexador: "PRE", empresa: "Solucoes Inv Itau", valAplicado: 300000, saldoBruto: 307287.84, ir: 0, iof: 0, saldoLiquido: 307287.84, alocacao: 1.14, vencimento: null, dataInicio: "10/09/25", rentab: { dez25: -0.72, nov25: 2.22, ano2025: 2.86, ano2024: null, m6: null, m12: null } },
+                { nome: "CRA BTG PACTUAL 11,96 09/2033", codigo: "CRA02300HWK", emissor: "BTG PACTUAL", tipo: "PRE", indexador: "PRE 11,96", empresa: "Itau Corretora", valAplicado: 454000, saldoBruto: 448805.95, ir: 0, iof: 0, saldoLiquido: 448805.95, alocacao: 1.67, vencimento: "15/09/2033", dataInicio: "13/03/24", rentab: { dez25: -0.54, nov25: 4.06, ano2025: 33.28, ano2024: -13.04, m6: 7.84, m12: 33.28 } },
+                { nome: "CRI ALLOS 11,67 04/2031", codigo: "24D0006603", emissor: "ALLOS", tipo: "PRE", indexador: "PRE 11,67", empresa: "Itau Corretora", valAplicado: 300000, saldoBruto: 288388.46, ir: 0, iof: 0, saldoLiquido: 288388.46, alocacao: 1.07, vencimento: "15/04/2031", dataInicio: "17/04/24", rentab: { dez25: -0.53, nov25: 1.04, ano2025: 28.47, ano2024: 8.85, m6: 6.52, m12: 28.47 } },
+                { nome: "LCA-PRE ITAU 12,55 06/2027", codigo: "-", emissor: "ITAU", tipo: "PRE", indexador: "PRE 12,55", empresa: "Tesouraria Itau", valAplicado: 250000, saldoBruto: 285238.49, ir: 0, iof: 0, saldoLiquido: 285238.49, alocacao: 1.06, vencimento: "16/06/2027", dataInicio: "14/11/24", rentab: { dez25: 1.25, nov25: 1.06, ano2025: 14.58, ano2024: 1.79, m6: 7.14, m12: 14.58 } },
+                { nome: "LCI-PRE ITAU 10,30 06/2026", codigo: "-", emissor: "ITAU", tipo: "PRE", indexador: "PRE 10,30", empresa: "Tesouraria Itau", valAplicado: 300000, saldoBruto: 348878.72, ir: 0, iof: 0, saldoLiquido: 348878.72, alocacao: 1.30, vencimento: "15/06/2026", dataInicio: "14/06/24", rentab: { dez25: 1.05, nov25: 0.88, ano2025: 12.05, ano2024: 6.46, m6: 5.93, m12: 12.05 } },
+                { nome: "LCI-PRE ITAU 12,03 10/2026", codigo: "-", emissor: "ITAU", tipo: "PRE", indexador: "PRE 12,03", empresa: "Tesouraria Itau", valAplicado: 300000, saldoBruto: 342743.18, ir: 0, iof: 0, saldoLiquido: 342743.18, alocacao: 1.27, vencimento: "26/10/2026", dataInicio: "25/10/24", rentab: { dez25: 1.20, nov25: 1.02, ano2025: 14.01, ano2024: 4.66, m6: 6.87, m12: 14.01 } },
+                { nome: "LCI-PRE ITAU 12,24 11/2026", codigo: "-", emissor: "ITAU", tipo: "PRE", indexador: "PRE 12,24", empresa: "Tesouraria Itau", valAplicado: 300000, saldoBruto: 342483.80, ir: 0, iof: 0, saldoLiquido: 342483.80, alocacao: 1.27, vencimento: "11/2026", dataInicio: "04/11/24", rentab: { dez25: 1.27, nov25: 1.04, ano2025: 14.28, ano2024: 2.13, m6: 6.99, m12: 14.28 } }
+            ]
+        },
+        { nome: "Multimercado", cor: "#10b981", saldoBruto: null, ir: null, iof: null, saldoLiquido: null, alocacao: 12.00, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true },
+        { nome: "Renda Variavel", cor: "#ef4444", saldoBruto: null, ir: null, iof: null, saldoLiquido: null, alocacao: 10.00, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true },
+        { nome: "Inflacao (IPCA+)", cor: "#f59e0b", saldoBruto: null, ir: null, iof: null, saldoLiquido: null, alocacao: 8.05, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true },
+        { nome: "Internacional", cor: "#06b6d4", saldoBruto: null, ir: null, iof: null, saldoLiquido: null, alocacao: 4.00, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true },
+        { nome: "Caixa/Liquidez", cor: "#64748b", saldoBruto: null, ir: null, iof: null, saldoLiquido: null, alocacao: 2.00, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true }
+    ]
+};
 
-    // ==========================================
-    // BENCHMARK COMPARISON CHART
-    // ==========================================
-
-    let benchmarkChart;
-    let selectedBenchPeriod = 'ano2025';
-
-    function createBenchmarkChart() {
-        const ctx = document.getElementById('benchmarkChart').getContext('2d');
-
-        benchmarkChart = new Chart(ctx, {
-            type: 'bar',
-            data: getBenchmarkData(selectedBenchPeriod),
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: { label: ctx => `${ctx.label}: ${fmt(ctx.raw)}%` }
-                    }
-                },
-                scales: {
-                    y: {
-                        grid: { color: 'rgba(51,65,85,0.5)' },
-                        ticks: { color: '#94a3b8', callback: v => v + '%' }
-                    },
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: '#f1f5f9', font: { size: 10 }, maxRotation: 45 }
-                    }
-                }
-            }
-        });
-
-        renderPeriodSelector('benchPeriodSelector', selectedBenchPeriod, (period) => {
-            selectedBenchPeriod = period;
-            benchmarkChart.data = getBenchmarkData(period);
-            benchmarkChart.update();
-        });
-    }
-
-    function getBenchmarkData(period) {
-        const portfolioReturn = getPortfolioWeightedReturn(period);
-        const items = [
-            { label: 'Carteira (Ponderada)', value: portfolioReturn, color: '#3b82f6' },
-            { label: 'Pós-fixado', value: PORTFOLIO.classes[0].rentab[period], color: PORTFOLIO.classes[0].cor },
-            { label: 'Prefixado', value: PORTFOLIO.classes[1].rentab[period], color: PORTFOLIO.classes[1].cor },
-            ...Object.values(BENCHMARKS).map(b => ({ label: b.label, value: b[period], color: b.cor }))
-        ];
-
-        return {
-            labels: items.map(i => i.label),
-            datasets: [{
-                data: items.map(i => i.value),
-                backgroundColor: items.map(i => {
-                    const v = i.value;
-                    if (v == null) return 'rgba(100,116,139,0.3)';
-                    return i.color + (v >= 0 ? 'cc' : '88');
-                }),
-                borderRadius: 4
-            }]
-        };
-    }
-
-    // ==========================================
-    // ALPHA CHART
-    // ==========================================
-
-    let alphaChart;
-    function createAlphaChart() {
-        const ctx = document.getElementById('alphaChart').getContext('2d');
-        const periods = ['dez25', 'nov25', 'ano2025', 'ano2024', 'm6', 'm12'];
-        const periodLabels = periods.map(p => PERIODS[p].short);
-
-        const classes = PORTFOLIO.classes.filter(c => !c.estimated);
-
-        alphaChart = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: periodLabels,
-                datasets: classes.map(c => ({
-                    label: c.nome,
-                    data: periods.map(p => c.rentab[p] != null ? c.rentab[p] - BENCHMARKS.CDI[p] : null),
-                    borderColor: c.cor,
-                    backgroundColor: c.cor + '33',
-                    fill: false,
-                    tension: 0.3,
-                    pointRadius: 5,
-                    pointHoverRadius: 7,
-                    spanGaps: true
-                }))
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: { display: true, position: 'top', labels: { color: '#94a3b8', font: { size: 11 } } },
-                    tooltip: {
-                        callbacks: {
-                            label: ctx => `${ctx.dataset.label}: ${ctx.raw != null ? (ctx.raw > 0 ? '+' : '') + fmt(ctx.raw) + '% vs CDI' : 'N/A'}`
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        grid: { color: 'rgba(51,65,85,0.5)' },
-                        ticks: { color: '#94a3b8', callback: v => (v > 0 ? '+' : '') + v + '%' },
-                        title: { display: true, text: 'Alpha vs CDI (%)', color: '#64748b' }
-                    },
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: '#f1f5f9' }
-                    }
-                }
-            }
-        });
-    }
-
-    // ==========================================
-    // BENCHMARK TABLE
-    // ==========================================
-
-    function renderBenchmarkTable() {
-        const container = document.getElementById('benchmarkTable');
-        const periods = ['dez25', 'nov25', 'ano2025', 'ano2024', 'm6', 'm12'];
-        const portfolioReturn = {};
-        periods.forEach(p => { portfolioReturn[p] = getPortfolioWeightedReturn(p); });
-
-        const rows = [
-            { label: 'Carteira (Ponderada)', data: portfolioReturn, highlight: true },
-            { label: 'Pós-fixado', data: PORTFOLIO.classes[0].rentab },
-            { label: 'Prefixado', data: PORTFOLIO.classes[1].rentab },
-            ...Object.values(BENCHMARKS).map(b => ({ label: b.label, data: b }))
-        ];
-
-        container.innerHTML = `
-            <table>
-                <thead>
-                    <tr>
-                        <th></th>
-                        ${periods.map(p => `<th class="text-right">${PERIODS[p].label}</th>`).join('')}
-                    </tr>
-                </thead>
-                <tbody>
-                    ${rows.map(r => `
-                        <tr ${r.highlight ? 'style="background: rgba(59,130,246,0.1);"' : ''}>
-                            <td><strong>${r.label}</strong></td>
-                            ${periods.map(p => {
-                                const v = r.data[p];
-                                return `<td class="text-right ${colorClass(v)}"><strong>${fmtPct(v)}</strong></td>`;
-                            }).join('')}
-                        </tr>
-                    `).join('')}
-                    <tr class="subtotal">
-                        <td><strong>Alpha vs CDI</strong></td>
-                        ${periods.map(p => {
-                            const alpha = portfolioReturn[p] != null ? portfolioReturn[p] - BENCHMARKS.CDI[p] : null;
-                            return `<td class="text-right ${colorClass(alpha)}"><strong>${alpha != null ? (alpha > 0 ? '+' : '') + fmt(alpha) + '%' : '-'}</strong></td>`;
-                        }).join('')}
-                    </tr>
-                    <tr>
-                        <td><strong>Retorno Real (vs IPCA)</strong></td>
-                        ${periods.map(p => {
-                            const real = portfolioReturn[p] != null ? portfolioReturn[p] - BENCHMARKS.IPCA[p] : null;
-                            return `<td class="text-right ${colorClass(real)}"><strong>${real != null ? (real > 0 ? '+' : '') + fmt(real) + '%' : '-'}</strong></td>`;
-                        }).join('')}
-                    </tr>
-                </tbody>
-            </table>
-        `;
-    }
-
-    // ==========================================
-    // ASSET DETAIL CHART
-    // ==========================================
-
-    let assetDetailChart;
-    let selectedDetailPeriod = 'ano2025';
-
-    function createAssetDetailChart() {
-        const ctx = document.getElementById('assetDetailChart').getContext('2d');
-
-        assetDetailChart = new Chart(ctx, {
-            type: 'bar',
-            data: getAssetDetailData(selectedDetailPeriod),
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            title: items => {
-                                const idx = items[0].dataIndex;
-                                return items[0].label;
-                            },
-                            label: ctx => `Rentabilidade: ${fmt(ctx.raw)}%`
-                        }
-                    }
-                },
-                scales: {
-                    y: {
-                        grid: { color: 'rgba(51,65,85,0.5)' },
-                        ticks: { color: '#94a3b8', callback: v => v + '%' }
-                    },
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: '#f1f5f9', font: { size: 9 }, maxRotation: 90, minRotation: 45 }
-                    }
-                }
-            }
-        });
-
-        renderPeriodSelector('detailPeriodSelector', selectedDetailPeriod, (period) => {
-            selectedDetailPeriod = period;
-            assetDetailChart.data = getAssetDetailData(period);
-            assetDetailChart.update();
-        });
-    }
-
-    function getAssetDetailData(period) {
-        const allAssets = [];
-        PORTFOLIO.classes.filter(c => !c.estimated).forEach(c => {
-            c.ativos.forEach(a => {
-                if (a.rentab[period] != null) {
-                    allAssets.push({
-                        nome: a.nome.length > 30 ? a.nome.substring(0, 28) + '...' : a.nome,
-                        rentab: a.rentab[period],
-                        cor: c.cor,
-                        classe: c.nome
-                    });
-                }
-            });
-        });
-        allAssets.sort((a, b) => b.rentab - a.rentab);
-
-        return {
-            labels: allAssets.map(a => a.nome),
-            datasets: [{
-                data: allAssets.map(a => a.rentab),
-                backgroundColor: allAssets.map(a => a.rentab >= 0 ? a.cor + 'cc' : '#ef444488'),
-                borderRadius: 3
-            }]
-        };
-    }
-
-    // ==========================================
-    // ASSETS TABLE
-    // ==========================================
-
-    let currentTableClass = 'all';
-    let sortColumn = 'alocacao';
-    let sortDir = -1;
-
-    function renderClassTabs() {
-        const container = document.getElementById('classTabsContainer');
-        const classes = [{ nome: 'Todos', key: 'all' }, ...PORTFOLIO.classes.filter(c => !c.estimated).map(c => ({ nome: c.nome, key: c.nome }))];
-
-        container.innerHTML = classes.map(c => `
-            <div class="tab ${c.key === currentTableClass ? 'active' : ''}" onclick="switchClassTab('${c.key}')">${c.nome}</div>
-        `).join('');
-    }
-
-    function switchClassTab(key) {
-        currentTableClass = key;
-        renderClassTabs();
-        renderAssetsTable();
-    }
-
-    function renderAssetsTable() {
-        const container = document.getElementById('assetsTableContainer');
-        let ativos = [];
-
-        if (currentTableClass === 'all') {
-            PORTFOLIO.classes.filter(c => !c.estimated).forEach(c => {
-                c.ativos.forEach(a => ativos.push({ ...a, classe: c.nome, classCor: c.cor }));
-            });
-        } else {
-            const cls = PORTFOLIO.classes.find(c => c.nome === currentTableClass);
-            if (cls) cls.ativos.forEach(a => ativos.push({ ...a, classe: cls.nome, classCor: cls.cor }));
+// Calculate estimated values
+(function() {
+    const totalBruto = PORTFOLIO.classes[0].saldoBruto / (PORTFOLIO.classes[0].alocacao / 100);
+    PORTFOLIO.classes.forEach(c => {
+        if (c.estimated) {
+            c.saldoBruto = totalBruto * (c.alocacao / 100);
+            c.saldoLiquido = c.saldoBruto * 0.9;
+            c.ir = c.saldoBruto * 0.1; c.iof = 0;
         }
+    });
+    PORTFOLIO.totalBruto = totalBruto;
+    PORTFOLIO.totalLiquido = PORTFOLIO.classes.reduce((s, c) => s + (c.saldoLiquido || 0), 0);
+    PORTFOLIO.totalIR = PORTFOLIO.classes.reduce((s, c) => s + (c.ir || 0), 0);
+})();
 
-        // Sort
-        ativos.sort((a, b) => {
-            let va = a[sortColumn], vb = b[sortColumn];
-            if (sortColumn.startsWith('rentab.')) {
-                const key = sortColumn.split('.')[1];
-                va = a.rentab[key];
-                vb = b.rentab[key];
-            }
-            if (va == null) va = -Infinity;
-            if (vb == null) vb = -Infinity;
-            return sortDir * (va - vb);
-        });
+// Benchmarks
+const BENCHMARKS = {
+    CDI: { dez25: 1.12, nov25: 0.79, ano2025: 14.15, ano2024: 10.76, m6: 7.02, m12: 14.15, label: "CDI", cor: "#f59e0b" },
+    IPCA: { dez25: 0.52, nov25: 0.39, ano2025: 4.83, ano2024: 4.83, m6: 2.80, m12: 4.83, label: "IPCA", cor: "#ef4444" },
+    SELIC: { dez25: 1.12, nov25: 0.79, ano2025: 14.25, ano2024: 10.87, m6: 7.10, m12: 14.25, label: "SELIC", cor: "#10b981" },
+    DOLAR: { dez25: -1.5, nov25: 3.8, ano2025: -8.00, ano2024: 27.34, m6: -6.0, m12: -8.00, label: "Dolar", cor: "#06b6d4" },
+    IBOVESPA: { dez25: -4.3, nov25: -3.1, ano2025: 12.00, ano2024: -10.36, m6: 2.5, m12: 12.00, label: "Ibovespa", cor: "#ec4899" },
+    IPCACDI: { dez25: 1.64, nov25: 1.18, ano2025: 19.66, ano2024: 16.11, m6: 10.02, m12: 19.66, label: "IPCA+CDI", cor: "#f97316" }
+};
 
-        const periods = ['dez25', 'nov25', 'ano2025', 'ano2024', 'm6', 'm12'];
+const PERIODS = {
+    dez25: { label: "Dez/25", short: "Dez" }, nov25: { label: "Nov/25", short: "Nov" },
+    ano2025: { label: "Ano 2025", short: "2025" }, ano2024: { label: "Ano 2024", short: "2024" },
+    m6: { label: "6 Meses", short: "6M" }, m12: { label: "12 Meses", short: "12M" }
+};
 
-        container.innerHTML = `
-            <table>
-                <thead>
-                    <tr>
-                        <th onclick="sortTable('nome')">Ativo ${sortIcon('nome')}</th>
-                        <th onclick="sortTable('classe')">Classe ${sortIcon('classe')}</th>
-                        <th onclick="sortTable('indexador')">Indexador ${sortIcon('indexador')}</th>
-                        <th class="text-right" onclick="sortTable('saldoBruto')">Saldo Bruto ${sortIcon('saldoBruto')}</th>
-                        <th class="text-right" onclick="sortTable('saldoLiquido')">Saldo Líquido ${sortIcon('saldoLiquido')}</th>
-                        <th class="text-right" onclick="sortTable('ir')">IR ${sortIcon('ir')}</th>
-                        <th class="text-right" onclick="sortTable('alocacao')">Alocação ${sortIcon('alocacao')}</th>
-                        ${periods.map(p => `<th class="text-right" onclick="sortTable('rentab.${p}')">Rentab ${PERIODS[p].short} ${sortIcon('rentab.' + p)}</th>`).join('')}
-                        <th>Vencimento</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    ${ativos.map(a => `
-                        <tr>
-                            <td title="${a.nome}">
-                                <span style="display:inline-block;width:4px;height:4px;border-radius:50%;background:${a.classCor};margin-right:6px;vertical-align:middle;"></span>
-                                ${a.nome.length > 35 ? a.nome.substring(0, 33) + '...' : a.nome}
-                            </td>
-                            <td>${a.classe}</td>
-                            <td>${a.indexador || '-'}</td>
-                            <td class="text-right">${fmtBRL(a.saldoBruto)}</td>
-                            <td class="text-right">${fmtBRL(a.saldoLiquido)}</td>
-                            <td class="text-right">${a.ir > 0 ? fmtBRL(a.ir) : '-'}</td>
-                            <td class="text-right"><strong>${fmtPct(a.alocacao)}</strong></td>
-                            ${periods.map(p => {
-                                const v = a.rentab[p];
-                                return `<td class="text-right ${colorClass(v)}"><strong>${fmtPct(v)}</strong></td>`;
-                            }).join('')}
-                            <td>${a.vencimento || '-'}</td>
-                        </tr>
-                    `).join('')}
-                </tbody>
-            </table>
-        `;
-    }
+// CDI Curve projections
+let COPOM_MEETINGS = [
+    { date: "29/01/2026", label: "Jan/26", selic: 15.25 },
+    { date: "19/03/2026", label: "Mar/26", selic: 15.75 },
+    { date: "07/05/2026", label: "Mai/26", selic: 15.75 },
+    { date: "18/06/2026", label: "Jun/26", selic: 15.50 },
+    { date: "06/08/2026", label: "Ago/26", selic: 15.00 },
+    { date: "17/09/2026", label: "Set/26", selic: 14.50 },
+    { date: "29/10/2026", label: "Out/26", selic: 14.00 },
+    { date: "10/12/2026", label: "Dez/26", selic: 13.50 },
+    { date: "01/06/2027", label: "Mid/27", selic: 12.00 },
+    { date: "01/12/2027", label: "Fim/27", selic: 11.00 },
+    { date: "01/12/2028", label: "Fim/28", selic: 10.00 }
+];
+const DEFAULT_COPOM = JSON.parse(JSON.stringify(COPOM_MEETINGS));
 
-    function sortTable(col) {
-        if (sortColumn === col) { sortDir *= -1; }
-        else { sortColumn = col; sortDir = -1; }
-        renderAssetsTable();
-    }
+// Rebalancing strategies
+const STRATEGIES = [
+    { id: 'manual', name: 'Manual', desc: 'Defina alvos manualmente', icon: '&#9998;', targets: null },
+    { id: 'cdi_optimized', name: 'CDI-Otimizado', desc: 'Baseado na curva de juros projetada', icon: '&#128200;',
+      targets: { 'Pos-fixado': 42, 'Prefixado': 20, 'Multimercado': 12, 'Renda Variavel': 10, 'Inflacao (IPCA+)': 10, 'Internacional': 4, 'Caixa/Liquidez': 2 } },
+    { id: 'conservative', name: 'Conservador', desc: 'Maximizar seguranca e liquidez', icon: '&#128737;',
+      targets: { 'Pos-fixado': 55, 'Prefixado': 10, 'Multimercado': 10, 'Renda Variavel': 5, 'Inflacao (IPCA+)': 12, 'Internacional': 3, 'Caixa/Liquidez': 5 } },
+    { id: 'balanced', name: 'Equilibrado', desc: 'Balancear risco e retorno', icon: '&#9878;',
+      targets: { 'Pos-fixado': 35, 'Prefixado': 15, 'Multimercado': 15, 'Renda Variavel': 15, 'Inflacao (IPCA+)': 10, 'Internacional': 7, 'Caixa/Liquidez': 3 } },
+    { id: 'aggressive', name: 'Arrojado', desc: 'Maximizar retorno com mais risco', icon: '&#128640;',
+      targets: { 'Pos-fixado': 20, 'Prefixado': 15, 'Multimercado': 15, 'Renda Variavel': 25, 'Inflacao (IPCA+)': 10, 'Internacional': 12, 'Caixa/Liquidez': 3 } }
+];
+let selectedStrategy = 'manual';
 
-    function sortIcon(col) {
-        if (sortColumn === col) return `<span class="sort-icon">${sortDir === 1 ? '▲' : '▼'}</span>`;
-        return '<span class="sort-icon">⇅</span>';
-    }
+// ==========================================
+// UTILITIES
+// ==========================================
+function fmt(v, d=2) { if (v==null||isNaN(v)) return "-"; return v.toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}); }
+function fmtBRL(v) { if (v==null||isNaN(v)) return "-"; return "R$ "+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+function fmtPct(v) { if (v==null||isNaN(v)) return "-"; return fmt(v)+"%"; }
+function colorClass(v) { if (v==null||isNaN(v)) return ""; return v>0?"positive":v<0?"negative":""; }
+function getPortfolioWeightedReturn(p) {
+    let tw=0,wr=0;
+    PORTFOLIO.classes.forEach(c=>{ if(c.rentab[p]!=null&&!c.estimated){ wr+=c.rentab[p]*c.alocacao; tw+=c.alocacao; }});
+    return tw>0?wr/tw:null;
+}
 
-    // ==========================================
-    // RISK METRICS
-    // ==========================================
+// ==========================================
+// THEME
+// ==========================================
+function toggleTheme() {
+    const html = document.documentElement;
+    const current = html.getAttribute('data-theme');
+    const next = current === 'dark' ? 'light' : 'dark';
+    html.setAttribute('data-theme', next);
+    document.getElementById('themeIcon').innerHTML = next === 'dark' ? '&#9790;' : '&#9728;';
+    document.getElementById('themeLabel').textContent = next === 'dark' ? 'Claro' : 'Escuro';
+    localStorage.setItem('theme', next);
+    rebuildCharts();
+}
+function loadTheme() {
+    const saved = localStorage.getItem('theme');
+    if (saved) { document.documentElement.setAttribute('data-theme', saved); document.getElementById('themeIcon').innerHTML = saved==='dark'?'&#9790;':'&#9728;'; document.getElementById('themeLabel').textContent = saved==='dark'?'Claro':'Escuro'; }
+}
 
-    function renderRiskMetrics() {
-        const container = document.getElementById('riskMetrics');
-        const allAtivos = [];
-        PORTFOLIO.classes.filter(c => !c.estimated).forEach(c => {
-            c.ativos.forEach(a => allAtivos.push({ ...a, classe: c.nome }));
-        });
-        allAtivos.sort((a, b) => b.alocacao - a.alocacao);
+// ==========================================
+// KPI CARDS
+// ==========================================
+function renderKPIs() {
+    const g = document.getElementById('kpi-grid');
+    const r25 = getPortfolioWeightedReturn('ano2025'), rD = getPortfolioWeightedReturn('dez25');
+    const aC = r25!=null?r25-BENCHMARKS.CDI.ano2025:null, aI = r25!=null?r25-BENCHMARKS.IPCA.ano2025:null;
+    const kpis = [
+        {l:"Patrimonio Bruto",v:fmtBRL(PORTFOLIO.totalBruto),s:`Liquido: ${fmtBRL(PORTFOLIO.totalLiquido)}`,c:"neutral"},
+        {l:"Rentab. 2025 (Carteira)",v:fmtPct(r25),s:`CDI: ${fmtPct(BENCHMARKS.CDI.ano2025)}`,c:colorClass(r25)},
+        {l:"Rentab. Dez/25",v:fmtPct(rD),s:`CDI: ${fmtPct(BENCHMARKS.CDI.dez25)}`,c:colorClass(rD)},
+        {l:"Alpha vs CDI (2025)",v:fmtPct(aC),s:aC>0?"Acima do CDI":"Abaixo do CDI",c:colorClass(aC)},
+        {l:"Retorno Real (vs IPCA)",v:fmtPct(aI),s:`IPCA 2025: ${fmtPct(BENCHMARKS.IPCA.ano2025)}`,c:colorClass(aI)},
+        {l:"IR + IOF Total",v:fmtBRL(PORTFOLIO.totalIR),s:`${fmt((PORTFOLIO.totalIR/PORTFOLIO.totalBruto)*100)}% do bruto`,c:"negative"}
+    ];
+    g.innerHTML=kpis.map(k=>`<div class="kpi-card"><div class="kpi-label">${k.l}</div><div class="kpi-value ${k.c}">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
+}
 
-        // Concentration
-        const top5 = allAtivos.slice(0, 5);
-        const top5Sum = top5.reduce((s, a) => s + a.alocacao, 0);
-        const hhi = allAtivos.reduce((s, a) => s + Math.pow(a.alocacao, 2), 0);
+// ==========================================
+// INSIGHTS
+// ==========================================
+function renderInsights() {
+    const c=document.getElementById('insights-section'); const ins=[];
+    const all=[]; PORTFOLIO.classes.filter(x=>!x.estimated).forEach(x=>x.ativos.forEach(a=>all.push({...a,classe:x.nome})));
+    all.sort((a,b)=>b.alocacao-a.alocacao);
+    const t5=all.slice(0,5).reduce((s,a)=>s+a.alocacao,0);
+    ins.push({t:"Concentracao",p:`Os 5 maiores ativos representam ${fmt(t5)}% da carteira. ${t5>30?"Considere diversificar.":"Boa diversificacao."} Destaque: ${all[0].nome} (${fmt(all[0].alocacao)}%)`});
+    const pf=PORTFOLIO.classes[0],pr=PORTFOLIO.classes[1];
+    if(pr.rentab.ano2025>pf.rentab.ano2025) ins.push({t:"Prefixado superou Pos-fixado em 2025",p:`Prefixado rendeu ${fmtPct(pr.rentab.ano2025)} vs ${fmtPct(pf.rentab.ano2025)} do Pos-fixado. O fechamento de taxa beneficiou os prefixados.`});
+    const btg=pr.ativos.find(a=>a.nome.includes("BTG"));
+    if(btg&&btg.rentab.ano2024<0) ins.push({t:"Atencao: Volatilidade no CRA BTG PACTUAL",p:`CRA BTG teve ${fmtPct(btg.rentab.ano2024)} em 2024, mas recuperou em 2025 (${fmtPct(btg.rentab.ano2025)}). Ativo longo (2033) com alta duration.`});
+    const prev=pf.ativos.filter(a=>a.tipo==='Previdencia'); const prevT=prev.reduce((s,a)=>s+a.alocacao,0);
+    if(prevT>0) ins.push({t:"Previdencia: Diferimento Fiscal",p:`Ativos de previdencia representam ${fmt(prevT)}% da carteira com IR diferido de ${fmtBRL(prev.reduce((s,a)=>s+(a.ir||0),0))}.`});
+    ins.push({t:"Ativos Isentos de IR",p:`Diversos ativos isentos (LCA, LCI, LIG, CRI, CRA, FII, Infra). O relatorio aplica "gross up" de 15% para comparabilidade. Retornos reais sao superiores.`});
+    c.innerHTML=`<div class="section-title">Insights da Carteira</div><div class="grid-2">${ins.map(i=>`<div class="insight-card"><h4>${i.t}</h4><p>${i.p}</p></div>`).join('')}</div>`;
+}
 
-        // Emitter concentration
-        const emitterMap = {};
-        allAtivos.forEach(a => {
-            const e = a.emissor || 'Outros';
-            emitterMap[e] = (emitterMap[e] || 0) + a.alocacao;
-        });
-        const topEmitter = Object.entries(emitterMap).sort((a, b) => b[1] - a[1])[0];
+// ==========================================
+// ALL CHARTS
+// ==========================================
+let charts = {};
+function destroyChart(name) { if(charts[name]){charts[name].destroy();charts[name]=null;} }
+function gridColor() { return getComputedStyle(document.documentElement).getPropertyValue('--chart-grid').trim()||'rgba(51,65,85,0.5)'; }
+function textColor() { return getComputedStyle(document.documentElement).getPropertyValue('--text-secondary').trim()||'#94a3b8'; }
+function textPrimary() { return getComputedStyle(document.documentElement).getPropertyValue('--text-primary').trim()||'#f1f5f9'; }
 
-        // Maturity
-        const withMaturity = allAtivos.filter(a => a.vencimento);
-        const avgYearsToMaturity = withMaturity.length > 0 ?
-            withMaturity.reduce((s, a) => {
-                const parts = a.vencimento.split('/');
-                const matDate = new Date(parts[2], parts[1] - 1, parts[0]);
-                const years = (matDate - new Date(2025, 11, 31)) / (365.25 * 24 * 60 * 60 * 1000);
-                return s + Math.max(0, years);
-            }, 0) / withMaturity.length : null;
+function createAllocationChart() {
+    destroyChart('allocation');
+    const cls=PORTFOLIO.classes;
+    charts.allocation=new Chart(document.getElementById('allocationChart').getContext('2d'),{
+        type:'doughnut', data:{labels:cls.map(c=>c.nome),datasets:[{data:cls.map(c=>c.alocacao),backgroundColor:cls.map(c=>c.cor),borderColor:getComputedStyle(document.documentElement).getPropertyValue('--bg-card').trim(),borderWidth:3,hoverOffset:8}]},
+        options:{responsive:true,maintainAspectRatio:true,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const c=cls[ctx.dataIndex];return[`${c.nome}: ${fmt(c.alocacao)}%`,c.saldoLiquido?`Liquido: ${fmtBRL(c.saldoLiquido)}`:'(estimado)'].filter(Boolean);}}}}}
+    });
+    document.getElementById('allocationLegend').innerHTML=cls.map(c=>`<div class="legend-item"><div class="legend-dot" style="background:${c.cor}"></div><span>${c.nome}: <strong>${fmt(c.alocacao)}%</strong>${c.estimated?' (est.)':''}</span></div>`).join('');
+}
 
-        // Tax drag
-        const taxDrag = (PORTFOLIO.totalIR / PORTFOLIO.totalBruto) * 100;
+let selectedClassPeriod='ano2025';
+function createClassPerformanceChart() {
+    destroyChart('classPerf');
+    const cls=PORTFOLIO.classes.filter(c=>!c.estimated);
+    charts.classPerf=new Chart(document.getElementById('classPerformanceChart').getContext('2d'),{
+        type:'bar',data:{labels:cls.map(c=>c.nome),datasets:[{label:'Classe',data:cls.map(c=>c.rentab[selectedClassPeriod]),backgroundColor:cls.map(c=>c.cor),borderRadius:4},{label:'CDI',data:cls.map(()=>BENCHMARKS.CDI[selectedClassPeriod]),backgroundColor:'rgba(245,158,11,0.6)',borderRadius:4}]},
+        options:{responsive:true,maintainAspectRatio:true,indexAxis:'y',plugins:{legend:{display:true,position:'top',labels:{color:textColor(),font:{size:11}}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmt(ctx.raw)}%`}}},scales:{x:{grid:{color:gridColor()},ticks:{color:textColor(),callback:v=>v+'%'}},y:{grid:{display:false},ticks:{color:textPrimary(),font:{size:11}}}}}
+    });
+    renderPeriodSelector('classPeriodSelector',selectedClassPeriod,p=>{selectedClassPeriod=p;createClassPerformanceChart();});
+}
 
-        container.innerHTML = `
-            <div class="card">
-                <div class="card-title">Concentração</div>
-                <div style="margin-bottom: 12px;">
-                    <div style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 8px;">Top 5 Ativos: <strong class="${top5Sum > 30 ? 'negative' : 'positive'}">${fmt(top5Sum)}%</strong></div>
-                    ${top5.map(a => `
-                        <div style="display: flex; justify-content: space-between; font-size: 0.78rem; padding: 3px 0; color: var(--text-secondary);">
-                            <span>${a.nome.substring(0, 30)}</span>
-                            <strong>${fmt(a.alocacao)}%</strong>
-                        </div>
-                    `).join('')}
-                </div>
-                <div style="font-size: 0.78rem; color: var(--text-muted);">HHI: ${fmt(hhi, 0)} ${hhi < 1000 ? '(diversificado)' : hhi < 2500 ? '(moderado)' : '(concentrado)'}</div>
-            </div>
-            <div class="card">
-                <div class="card-title">Concentração por Emissor</div>
-                ${Object.entries(emitterMap).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([e, pct]) => `
-                    <div style="margin-bottom: 8px;">
-                        <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 3px;">
-                            <span>${e}</span><strong>${fmt(pct)}%</strong>
-                        </div>
-                        <div class="rebal-bar">
-                            <div class="rebal-bar-fill" style="width: ${Math.min(pct * 1.5, 100)}%; background: ${pct > 30 ? 'var(--accent-red)' : pct > 15 ? 'var(--accent-yellow)' : 'var(--accent-green)'};"></div>
-                        </div>
-                    </div>
-                `).join('')}
-                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">
-                    ${topEmitter ? `Maior emissor: ${topEmitter[0]} (${fmt(topEmitter[1])}%)` : ''}
-                    ${topEmitter && topEmitter[1] > 30 ? ' - Considere diversificar entre emissores.' : ''}
-                </div>
-            </div>
-            <div class="card">
-                <div class="card-title">Outras Métricas</div>
-                <div style="font-size: 0.82rem; color: var(--text-secondary);">
-                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
-                        <span>Total de Ativos</span><strong>${allAtivos.length}</strong>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
-                        <span>Classes Visíveis</span><strong>${PORTFOLIO.classes.filter(c => !c.estimated).length}</strong>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
-                        <span>Prazo Médio (vencimento)</span><strong>${avgYearsToMaturity != null ? fmt(avgYearsToMaturity, 1) + ' anos' : 'N/A'}</strong>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
-                        <span>Impacto IR (% do bruto)</span><strong class="negative">${fmt(taxDrag)}%</strong>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; padding: 8px 0;">
-                        <span>Patrimônio Bruto Est.</span><strong>${fmtBRL(PORTFOLIO.totalBruto)}</strong>
-                    </div>
-                </div>
-            </div>
-        `;
-    }
+let selectedBenchPeriod='ano2025';
+function createBenchmarkChart() {
+    destroyChart('bench');
+    const pr=getPortfolioWeightedReturn(selectedBenchPeriod);
+    const items=[{l:'Carteira',v:pr,c:'#3b82f6'},{l:'Pos-fixado',v:PORTFOLIO.classes[0].rentab[selectedBenchPeriod],c:PORTFOLIO.classes[0].cor},{l:'Prefixado',v:PORTFOLIO.classes[1].rentab[selectedBenchPeriod],c:PORTFOLIO.classes[1].cor},...Object.values(BENCHMARKS).map(b=>({l:b.label,v:b[selectedBenchPeriod],c:b.cor}))];
+    charts.bench=new Chart(document.getElementById('benchmarkChart').getContext('2d'),{
+        type:'bar',data:{labels:items.map(i=>i.l),datasets:[{data:items.map(i=>i.v),backgroundColor:items.map(i=>i.v>=0?i.c+'cc':i.c+'66'),borderRadius:4}]},
+        options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`${ctx.label}: ${fmt(ctx.raw)}%`}}},scales:{y:{grid:{color:gridColor()},ticks:{color:textColor(),callback:v=>v+'%'}},x:{grid:{display:false},ticks:{color:textPrimary(),font:{size:10},maxRotation:45}}}}
+    });
+    renderPeriodSelector('benchPeriodSelector',selectedBenchPeriod,p=>{selectedBenchPeriod=p;createBenchmarkChart();});
+}
 
-    // ==========================================
-    // REBALANCING TOOL
-    // ==========================================
+function createAlphaChart() {
+    destroyChart('alpha');
+    const periods=['dez25','nov25','ano2025','ano2024','m6','m12'];
+    const cls=PORTFOLIO.classes.filter(c=>!c.estimated);
+    charts.alpha=new Chart(document.getElementById('alphaChart').getContext('2d'),{
+        type:'line',data:{labels:periods.map(p=>PERIODS[p].short),datasets:cls.map(c=>({label:c.nome,data:periods.map(p=>c.rentab[p]!=null?c.rentab[p]-BENCHMARKS.CDI[p]:null),borderColor:c.cor,backgroundColor:c.cor+'33',fill:false,tension:0.3,pointRadius:5,spanGaps:true}))},
+        options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{display:true,position:'top',labels:{color:textColor(),font:{size:11}}},tooltip:{callbacks:{label:ctx=>`${ctx.dataset.label}: ${ctx.raw!=null?(ctx.raw>0?'+':'')+fmt(ctx.raw)+'% vs CDI':'N/A'}`}}},scales:{y:{grid:{color:gridColor()},ticks:{color:textColor(),callback:v=>(v>0?'+':'')+v+'%'},title:{display:true,text:'Alpha vs CDI (%)',color:textColor()}},x:{grid:{display:false},ticks:{color:textPrimary()}}}}
+    });
+}
 
-    const rebalTargets = {};
+function renderBenchmarkTable() {
+    const c=document.getElementById('benchmarkTable');
+    const periods=['dez25','nov25','ano2025','ano2024','m6','m12'];
+    const pr={}; periods.forEach(p=>{pr[p]=getPortfolioWeightedReturn(p);});
+    const rows=[{l:'Carteira (Ponderada)',d:pr,h:true},{l:'Pos-fixado',d:PORTFOLIO.classes[0].rentab},{l:'Prefixado',d:PORTFOLIO.classes[1].rentab},...Object.values(BENCHMARKS).map(b=>({l:b.label,d:b}))];
+    c.innerHTML=`<table><thead><tr><th></th>${periods.map(p=>`<th class="text-right">${PERIODS[p].label}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr ${r.h?'style="background:rgba(59,130,246,0.1);"':''}><td><strong>${r.l}</strong></td>${periods.map(p=>`<td class="text-right ${colorClass(r.d[p])}"><strong>${fmtPct(r.d[p])}</strong></td>`).join('')}</tr>`).join('')}<tr class="subtotal"><td><strong>Alpha vs CDI</strong></td>${periods.map(p=>{const a=pr[p]!=null?pr[p]-BENCHMARKS.CDI[p]:null;return`<td class="text-right ${colorClass(a)}"><strong>${a!=null?(a>0?'+':'')+fmt(a)+'%':'-'}</strong></td>`;}).join('')}</tr></tbody></table>`;
+}
 
-    function renderRebalancingInputs() {
-        const container = document.getElementById('rebalancingInputs');
-        const classes = PORTFOLIO.classes;
+let selectedDetailPeriod='ano2025';
+function createAssetDetailChart() {
+    destroyChart('detail');
+    const all=[];
+    PORTFOLIO.classes.filter(c=>!c.estimated).forEach(c=>c.ativos.forEach(a=>{if(a.rentab[selectedDetailPeriod]!=null)all.push({n:a.nome.length>30?a.nome.substring(0,28)+'...':a.nome,r:a.rentab[selectedDetailPeriod],c:c.cor});}));
+    all.sort((a,b)=>b.r-a.r);
+    charts.detail=new Chart(document.getElementById('assetDetailChart').getContext('2d'),{
+        type:'bar',data:{labels:all.map(a=>a.n),datasets:[{data:all.map(a=>a.r),backgroundColor:all.map(a=>a.r>=0?a.c+'cc':'#ef444488'),borderRadius:3}]},
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>`Rentabilidade: ${fmt(ctx.raw)}%`}}},scales:{y:{grid:{color:gridColor()},ticks:{color:textColor(),callback:v=>v+'%'}},x:{grid:{display:false},ticks:{color:textPrimary(),font:{size:9},maxRotation:90,minRotation:45}}}}
+    });
+    renderPeriodSelector('detailPeriodSelector',selectedDetailPeriod,p=>{selectedDetailPeriod=p;createAssetDetailChart();});
+}
 
-        container.innerHTML = `
-            <div class="rebal-row header">
-                <div>Classe</div>
-                <div>Atual (%)</div>
-                <div>Alvo (%)</div>
-                <div>Diferença</div>
-                <div>Barra</div>
-                <div>Valor (R$)</div>
-            </div>
-            ${classes.map(c => {
-                if (!rebalTargets[c.nome]) rebalTargets[c.nome] = c.alocacao;
-                const diff = rebalTargets[c.nome] - c.alocacao;
-                return `
-                    <div class="rebal-row">
-                        <div style="font-size: 0.85rem;">
-                            <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c.cor};margin-right:6px;"></span>
-                            ${c.nome}
-                        </div>
-                        <div style="font-size: 0.85rem; color: var(--text-secondary);">${fmt(c.alocacao)}%</div>
-                        <div>
-                            <input type="number" class="rebal-input" value="${fmt(rebalTargets[c.nome])}"
-                                   step="0.5" min="0" max="100"
-                                   onchange="updateTarget('${c.nome}', this.value)">
-                        </div>
-                        <div class="rebal-diff ${colorClass(diff)}">${diff > 0 ? '+' : ''}${fmt(diff)}%</div>
-                        <div class="rebal-bar">
-                            <div class="rebal-bar-fill" style="width: ${Math.min(rebalTargets[c.nome], 100)}%; background: ${c.cor};"></div>
-                        </div>
-                        <div style="font-size: 0.82rem; color: var(--text-secondary);">${fmtBRL((rebalTargets[c.nome] / 100) * PORTFOLIO.totalBruto)}</div>
-                    </div>
-                `;
-            }).join('')}
-            <div style="margin-top: 8px; font-size: 0.8rem; color: var(--text-muted);">
-                Total alvo: <strong id="totalTarget">${fmt(Object.values(rebalTargets).reduce((s, v) => s + v, 0))}%</strong>
-                ${Math.abs(Object.values(rebalTargets).reduce((s, v) => s + v, 0) - 100) > 0.1 ? '<span class="negative"> (deve somar 100%)</span>' : '<span class="positive"> OK</span>'}
-            </div>
-        `;
-    }
+// ==========================================
+// ASSETS TABLE
+// ==========================================
+let currentTableClass='all', sortColumn='alocacao', sortDir=-1;
+function renderClassTabs() {
+    const c=document.getElementById('classTabsContainer');
+    const cls=[{nome:'Todos',key:'all'},...PORTFOLIO.classes.filter(x=>!x.estimated).map(x=>({nome:x.nome,key:x.nome}))];
+    c.innerHTML=cls.map(x=>`<div class="tab ${x.key===currentTableClass?'active':''}" onclick="switchClassTab('${x.key}')">${x.nome}</div>`).join('');
+}
+function switchClassTab(k){currentTableClass=k;renderClassTabs();renderAssetsTable();}
+function renderAssetsTable() {
+    const c=document.getElementById('assetsTableContainer'); let ativos=[];
+    if(currentTableClass==='all'){PORTFOLIO.classes.filter(x=>!x.estimated).forEach(x=>x.ativos.forEach(a=>ativos.push({...a,classe:x.nome,classCor:x.cor})));}
+    else{const cls=PORTFOLIO.classes.find(x=>x.nome===currentTableClass);if(cls)cls.ativos.forEach(a=>ativos.push({...a,classe:cls.nome,classCor:cls.cor}));}
+    ativos.sort((a,b)=>{let va=a[sortColumn],vb=b[sortColumn];if(sortColumn.startsWith('rentab.')){const k=sortColumn.split('.')[1];va=a.rentab[k];vb=b.rentab[k];}if(va==null)va=-Infinity;if(vb==null)vb=-Infinity;return sortDir*(va-vb);});
+    const ps=['dez25','nov25','ano2025','ano2024','m6','m12'];
+    c.innerHTML=`<table><thead><tr><th onclick="doSort('nome')">Ativo</th><th onclick="doSort('classe')">Classe</th><th onclick="doSort('indexador')">Indexador</th><th class="text-right" onclick="doSort('saldoBruto')">Saldo Bruto</th><th class="text-right" onclick="doSort('saldoLiquido')">Saldo Liquido</th><th class="text-right" onclick="doSort('ir')">IR</th><th class="text-right" onclick="doSort('alocacao')">Alocacao</th>${ps.map(p=>`<th class="text-right" onclick="doSort('rentab.${p}')">R.${PERIODS[p].short}</th>`).join('')}<th>Vencimento</th></tr></thead><tbody>${ativos.map(a=>`<tr><td title="${a.nome}"><span style="display:inline-block;width:4px;height:4px;border-radius:50%;background:${a.classCor};margin-right:6px;vertical-align:middle;"></span>${a.nome.length>35?a.nome.substring(0,33)+'...':a.nome}</td><td>${a.classe}</td><td>${a.indexador||'-'}</td><td class="text-right">${fmtBRL(a.saldoBruto)}</td><td class="text-right">${fmtBRL(a.saldoLiquido)}</td><td class="text-right">${a.ir>0?fmtBRL(a.ir):'-'}</td><td class="text-right"><strong>${fmtPct(a.alocacao)}</strong></td>${ps.map(p=>`<td class="text-right ${colorClass(a.rentab[p])}"><strong>${fmtPct(a.rentab[p])}</strong></td>`).join('')}<td>${a.vencimento||'-'}</td></tr>`).join('')}</tbody></table>`;
+}
+function doSort(col){if(sortColumn===col)sortDir*=-1;else{sortColumn=col;sortDir=-1;}renderAssetsTable();}
 
-    function updateTarget(classe, value) {
-        rebalTargets[classe] = parseFloat(value) || 0;
-        renderRebalancingInputs();
-    }
+// ==========================================
+// RISK METRICS
+// ==========================================
+function renderRiskMetrics() {
+    const c=document.getElementById('riskMetrics');
+    const all=[]; PORTFOLIO.classes.filter(x=>!x.estimated).forEach(x=>x.ativos.forEach(a=>all.push({...a,classe:x.nome})));
+    all.sort((a,b)=>b.alocacao-a.alocacao);
+    const t5=all.slice(0,5); const t5s=t5.reduce((s,a)=>s+a.alocacao,0);
+    const hhi=all.reduce((s,a)=>s+Math.pow(a.alocacao,2),0);
+    const em={}; all.forEach(a=>{const e=a.emissor||'Outros';em[e]=(em[e]||0)+a.alocacao;});
+    const topE=Object.entries(em).sort((a,b)=>b[1]-a[1]);
+    const wm=all.filter(a=>a.vencimento);
+    let avgY=null;
+    if(wm.length>0){avgY=wm.reduce((s,a)=>{const p=a.vencimento.split('/');const d=new Date(p[2]||2026,parseInt(p[1]||1)-1,parseInt(p[0]||1));return s+Math.max(0,(d-new Date(2025,11,31))/(365.25*86400000));},0)/wm.length;}
+    c.innerHTML=`
+    <div class="card"><div class="card-title">Concentracao</div><div style="margin-bottom:12px"><div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:8px">Top 5: <strong class="${t5s>30?'negative':'positive'}">${fmt(t5s)}%</strong></div>${t5.map(a=>`<div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:3px 0;color:var(--text-secondary)"><span>${a.nome.substring(0,30)}</span><strong>${fmt(a.alocacao)}%</strong></div>`).join('')}</div><div style="font-size:0.78rem;color:var(--text-muted)">HHI: ${fmt(hhi,0)} ${hhi<1000?'(diversificado)':hhi<2500?'(moderado)':'(concentrado)'}</div></div>
+    <div class="card"><div class="card-title">Concentracao por Emissor</div>${topE.slice(0,6).map(([e,p])=>`<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:0.82rem;margin-bottom:3px"><span>${e}</span><strong>${fmt(p)}%</strong></div><div class="rebal-bar"><div class="rebal-bar-fill" style="width:${Math.min(p*1.5,100)}%;background:${p>30?'var(--accent-red)':p>15?'var(--accent-yellow)':'var(--accent-green)'}"></div></div></div>`).join('')}</div>
+    <div class="card"><div class="card-title">Outras Metricas</div><div style="font-size:0.82rem;color:var(--text-secondary)"><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>Total de Ativos</span><strong>${all.length}</strong></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>Classes Detalhadas</span><strong>${PORTFOLIO.classes.filter(x=>!x.estimated).length}</strong></div><div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)"><span>Prazo Medio</span><strong>${avgY!=null?fmt(avgY,1)+' anos':'N/A'}</strong></div><div style="display:flex;justify-content:space-between;padding:8px 0"><span>IR (% do bruto)</span><strong class="negative">${fmt((PORTFOLIO.totalIR/PORTFOLIO.totalBruto)*100)}%</strong></div></div></div>`;
+}
 
-    function resetTargets() {
-        PORTFOLIO.classes.forEach(c => { rebalTargets[c.nome] = c.alocacao; });
-        renderRebalancingInputs();
-        document.getElementById('rebalancingResults').innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">Defina as alocações alvo e clique em "Calcular Rebalanceamento"</p>';
-        if (rebalanceChartInstance) { rebalanceChartInstance.destroy(); rebalanceChartInstance = null; }
-    }
+// ==========================================
+// CDI YIELD CURVE (NEW)
+// ==========================================
+function renderCopomGrid() {
+    const g=document.getElementById('copomGrid');
+    g.innerHTML=COPOM_MEETINGS.map((m,i)=>`<div class="copom-item"><label>${m.label}</label><input type="number" step="0.25" value="${m.selic}" onchange="COPOM_MEETINGS[${i}].selic=parseFloat(this.value)||0"></div>`).join('');
+}
+function updateCdiCurve(){createCdiCurveChart();renderCdiImpact();}
+function resetCdiCurve(){COPOM_MEETINGS=JSON.parse(JSON.stringify(DEFAULT_COPOM));renderCopomGrid();updateCdiCurve();}
 
-    let rebalanceChartInstance;
+function createCdiCurveChart() {
+    destroyChart('cdiCurve');
+    const labels=['Atual (14,25%)',...COPOM_MEETINGS.map(m=>m.label)];
+    const data=[14.25,...COPOM_MEETINGS.map(m=>m.selic)];
+    charts.cdiCurve=new Chart(document.getElementById('cdiCurveChart').getContext('2d'),{
+        type:'line',data:{labels,datasets:[{label:'SELIC Projetada (%)',data,borderColor:'#3b82f6',backgroundColor:'rgba(59,130,246,0.1)',fill:true,tension:0.3,pointRadius:6,pointHoverRadius:8,pointBackgroundColor:data.map((v,i)=>i===0?'#f59e0b':v>14.25?'#ef4444':v<14.25?'#10b981':'#3b82f6')}]},
+        options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{labels:{color:textColor()}},tooltip:{callbacks:{label:ctx=>`SELIC: ${fmt(ctx.raw)}%`}}},scales:{y:{grid:{color:gridColor()},ticks:{color:textColor(),callback:v=>v+'%'},title:{display:true,text:'SELIC Meta (%)',color:textColor()}},x:{grid:{display:false},ticks:{color:textPrimary(),font:{size:10},maxRotation:45}}}}
+    });
+}
 
-    function calculateRebalancing() {
-        const totalTarget = Object.values(rebalTargets).reduce((s, v) => s + v, 0);
-        if (Math.abs(totalTarget - 100) > 0.5) {
-            document.getElementById('rebalancingResults').innerHTML = `<p class="negative" style="font-size: 0.85rem;">A soma dos alvos deve ser 100%. Atual: ${fmt(totalTarget)}%</p>`;
-            return;
+function renderCdiImpact() {
+    const c=document.getElementById('cdiImpactAnalysis');
+    const curveEnd=COPOM_MEETINGS[COPOM_MEETINGS.length-1].selic;
+    const curvePeak=Math.max(...COPOM_MEETINGS.map(m=>m.selic));
+    const curveMin=Math.min(...COPOM_MEETINGS.map(m=>m.selic));
+    const isRising=COPOM_MEETINGS[1].selic>14.25;
+    const willFall=curveEnd<curvePeak;
+    const impacts=[
+        {classe:'Pos-fixado',cor:'#3b82f6',signal:isRising?'positive':'negative',impact:isRising?'Favoravel: juros altos beneficiam pos-fixados no curto prazo. CDI projetado acima de 14% mantem retornos elevados.':'Atencao: queda do CDI reduzira retornos. Considere travar taxas em prefixados.',action:isRising?'Manter ou aumentar exposicao em CDI% acima de 100%':'Reduzir gradualmente; migrar para prefixados ou IPCA+'},
+        {classe:'Prefixado',cor:'#8b5cf6',signal:willFall?'positive':'negative',impact:willFall?'Oportunidade: queda futura de juros gera ganho de capital (marcacao a mercado positiva) em prefixados longos.':'Risco: se juros subirem mais, prefixados longos terao marcacao negativa.',action:willFall?'Aumentar posicao em prefixados longos (2028+). Debentures infra com boa relacao risco/retorno.':'Reduzir duration; preferir prefixados curtos (2026-2027)'},
+        {classe:'Inflacao (IPCA+)',cor:'#f59e0b',signal:'positive',impact:'Protecao contra inflacao + juros reais historicamente altos. NTN-Bs longas oferecem taxa real atrativa.',action:'Considerar aumento para 10-12% da carteira. Preferir NTN-B com vencimento 2030-2035.'},
+        {classe:'Renda Variavel',cor:'#ef4444',signal:willFall?'positive':'negative',impact:willFall?'Potencial de valorizacao: queda de juros reduz taxa de desconto e favorece acoes.':'Competicao com RF: juros altos tornam RF mais atrativa vs acoes.',action:willFall?'Aumentar gradualmente. Focar em empresas com receita previsivel e dividendos.':'Manter posicao defensiva. Preferir FIIs com yield acima do CDI.'}
+    ];
+    c.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">${impacts.map(i=>`<div class="insight-card" style="border-left:4px solid ${i.cor}"><h4 style="color:${i.cor}">${i.classe} <span class="${i.signal}" style="font-size:0.75rem">${i.signal==='positive'?'&#9650; FAVORAVEL':'&#9660; ATENCAO'}</span></h4><p>${i.impact}</p><p style="margin-top:8px;font-size:0.78rem;color:var(--text-primary)"><strong>Sugestao:</strong> ${i.action}</p></div>`).join('')}</div>`;
+}
+
+// ==========================================
+// SMART REBALANCING (NEW)
+// ==========================================
+const rebalTargets={};
+function renderStrategyCards() {
+    const c=document.getElementById('strategyCards');
+    c.innerHTML=STRATEGIES.map(s=>`<div class="strategy-card ${selectedStrategy===s.id?'active':''}" onclick="selectStrategy('${s.id}')"><div style="font-size:1.5rem">${s.icon}</div><h4>${s.name}</h4><p>${s.desc}</p></div>`).join('');
+}
+function selectStrategy(id){selectedStrategy=id;renderStrategyCards();}
+function applyStrategyTargets() {
+    const s=STRATEGIES.find(x=>x.id===selectedStrategy);
+    if(!s||!s.targets){return;}
+    PORTFOLIO.classes.forEach(c=>{rebalTargets[c.nome]=s.targets[c.nome]||c.alocacao;});
+    renderRebalancingInputs();
+    calculateRebalancing();
+}
+
+function renderRebalancingInputs() {
+    const c=document.getElementById('rebalancingInputs');
+    const cls=PORTFOLIO.classes;
+    cls.forEach(x=>{if(!rebalTargets[x.nome])rebalTargets[x.nome]=x.alocacao;});
+    const total=Object.values(rebalTargets).reduce((s,v)=>s+v,0);
+    c.innerHTML=`<div class="rebal-row header"><div>Classe</div><div>Atual</div><div>Alvo</div><div>Diff</div><div>Barra</div><div>Valor Alvo</div></div>${cls.map(x=>{const d=rebalTargets[x.nome]-x.alocacao;return`<div class="rebal-row"><div style="font-size:0.82rem"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${x.cor};margin-right:6px"></span>${x.nome}${x.estimated?' *':''}</div><div style="font-size:0.82rem;color:var(--text-secondary)">${fmt(x.alocacao)}%</div><div><input type="number" class="rebal-input" value="${fmt(rebalTargets[x.nome])}" step="0.5" min="0" max="100" onchange="rebalTargets['${x.nome}']=parseFloat(this.value)||0;renderRebalancingInputs()"></div><div class="rebal-diff ${colorClass(d)}">${d>0?'+':''}${fmt(d)}%</div><div class="rebal-bar"><div class="rebal-bar-fill" style="width:${Math.min(rebalTargets[x.nome],60)/60*100}%;background:${x.cor}"></div></div><div style="font-size:0.8rem;color:var(--text-secondary)">${fmtBRL((rebalTargets[x.nome]/100)*PORTFOLIO.totalBruto)}</div></div>`;}).join('')}<div style="margin-top:8px;font-size:0.8rem;color:var(--text-muted)">Total: <strong class="${Math.abs(total-100)>0.5?'negative':'positive'}">${fmt(total)}%</strong> ${Math.abs(total-100)>0.5?'(deve somar 100%)':'OK'}</div>`;
+}
+
+let rebalanceChartInstance;
+function calculateRebalancing() {
+    const total=Object.values(rebalTargets).reduce((s,v)=>s+v,0);
+    const rc=document.getElementById('rebalancingResults');
+    if(Math.abs(total-100)>0.5){rc.innerHTML=`<p class="negative">Soma dos alvos: ${fmt(total)}%. Deve ser 100%.</p>`;return;}
+    const results=PORTFOLIO.classes.map(c=>({classe:c.nome,cor:c.cor,atual:c.alocacao,alvo:rebalTargets[c.nome]||c.alocacao,valorAtual:(c.alocacao/100)*PORTFOLIO.totalBruto,valorAlvo:((rebalTargets[c.nome]||c.alocacao)/100)*PORTFOLIO.totalBruto,mov:((rebalTargets[c.nome]||c.alocacao)-c.alocacao)/100*PORTFOLIO.totalBruto,estimated:c.estimated}));
+    rc.innerHTML=`<div style="font-size:0.82rem;margin-bottom:12px;color:var(--text-secondary)">Movimentacoes sugeridas:</div>${results.filter(r=>Math.abs(r.mov)>500).map(r=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><div style="font-size:0.85rem"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${r.cor};margin-right:6px"></span>${r.classe}${r.estimated?' *':''}</div><div style="text-align:right"><div class="${r.mov>0?'positive':'negative'}" style="font-weight:600;font-size:0.9rem">${r.mov>0?'Comprar':'Vender'} ${fmtBRL(Math.abs(r.mov))}</div><div style="font-size:0.75rem;color:var(--text-muted)">${fmt(r.atual)}% -> ${fmt(r.alvo)}%</div></div></div>`).join('')}${results.filter(r=>Math.abs(r.mov)<=500).length>0?`<div style="font-size:0.78rem;color:var(--text-muted);margin-top:8px">${results.filter(r=>Math.abs(r.mov)<=500).length} classe(s) ja no alvo.</div>`:''}`;
+    // Chart
+    destroyChart('rebal');
+    charts.rebal=new Chart(document.getElementById('rebalanceChart').getContext('2d'),{
+        type:'bar',data:{labels:results.map(r=>r.classe),datasets:[{label:'Atual',data:results.map(r=>r.atual),backgroundColor:results.map(r=>r.cor+'66'),borderColor:results.map(r=>r.cor),borderWidth:1,borderRadius:3},{label:'Alvo',data:results.map(r=>r.alvo),backgroundColor:results.map(r=>r.cor+'cc'),borderColor:results.map(r=>r.cor),borderWidth:2,borderRadius:3}]},
+        options:{responsive:true,maintainAspectRatio:true,plugins:{legend:{position:'top',labels:{color:textColor(),font:{size:11}}}},scales:{y:{grid:{color:gridColor()},ticks:{color:textColor(),callback:v=>v+'%'}},x:{grid:{display:false},ticks:{color:textPrimary(),font:{size:9}}}}}
+    });
+}
+function resetTargets(){PORTFOLIO.classes.forEach(c=>{rebalTargets[c.nome]=c.alocacao;});renderRebalancingInputs();document.getElementById('rebalancingResults').innerHTML='<p style="color:var(--text-muted);font-size:0.85rem;">Defina alvos e clique calcular.</p>';destroyChart('rebal');}
+
+// Maturity Calendar
+function renderMaturityCalendar() {
+    const c=document.getElementById('maturityCalendar');
+    const all=[]; PORTFOLIO.classes.filter(x=>!x.estimated).forEach(x=>x.ativos.forEach(a=>{if(a.vencimento)all.push({...a,classe:x.nome,classCor:x.cor});}));
+    all.sort((a,b)=>{const pa=a.vencimento.split('/'),pb=b.vencimento.split('/');return new Date(pa[2]||2026,parseInt(pa[1]||1)-1,parseInt(pa[0]||1))-new Date(pb[2]||2026,parseInt(pb[1]||1)-1,parseInt(pb[0]||1));});
+    if(all.length===0){c.innerHTML='<p style="color:var(--text-muted)">Nenhum ativo com vencimento definido.</p>';return;}
+    c.innerHTML=`<div class="table-container"><table><thead><tr><th>Ativo</th><th>Classe</th><th>Vencimento</th><th class="text-right">Saldo Bruto</th><th class="text-right">Alocacao</th><th>Indexador</th><th>Oportunidade</th></tr></thead><tbody>${all.map(a=>{
+        const parts=a.vencimento.split('/');const vd=new Date(parts[2]||2026,parseInt(parts[1]||1)-1,parseInt(parts[0]||1));
+        const days=Math.round((vd-new Date(2025,11,31))/(86400000));
+        const opp=days<180?'<span class="negative">Vence em breve - planejar reinvestimento</span>':days<365?'<span style="color:var(--accent-yellow)">Vence em menos de 1 ano</span>':'<span style="color:var(--text-muted)">Longo prazo</span>';
+        return`<tr><td>${a.nome.substring(0,35)}</td><td><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${a.classCor};margin-right:4px"></span>${a.classe}</td><td>${a.vencimento}</td><td class="text-right">${fmtBRL(a.saldoBruto)}</td><td class="text-right">${fmtPct(a.alocacao)}</td><td>${a.indexador||'-'}</td><td>${opp}</td></tr>`;}).join('')}</tbody></table></div>`;
+}
+
+// ==========================================
+// FILE UPLOAD & PARSER (NEW)
+// ==========================================
+function initUpload() {
+    const zone=document.getElementById('uploadZone');
+    const input=document.getElementById('fileInput');
+    zone.addEventListener('click',()=>input.click());
+    zone.addEventListener('dragover',e=>{e.preventDefault();zone.classList.add('dragover');});
+    zone.addEventListener('dragleave',()=>zone.classList.remove('dragover'));
+    zone.addEventListener('drop',e=>{e.preventDefault();zone.classList.remove('dragover');if(e.dataTransfer.files.length)processFile(e.dataTransfer.files[0]);});
+    input.addEventListener('change',e=>{if(e.target.files.length)processFile(e.target.files[0]);});
+}
+
+function setUploadStatus(msg,type){const s=document.getElementById('uploadStatus');s.className='upload-status '+type;s.textContent=msg;}
+
+function processFile(file) {
+    setUploadStatus('Processando '+file.name+'...','loading');
+    const reader=new FileReader();
+    reader.onload=function(e){
+        try{
+            const data=new Uint8Array(e.target.result);
+            const wb=XLSX.read(data,{type:'array'});
+            // Find best sheet
+            let sheetName=wb.SheetNames.find(n=>n.toLowerCase().includes('classe de ativo')&&n.toLowerCase().includes('gross up'))||wb.SheetNames[0];
+            const ws=wb.Sheets[sheetName];
+            const json=XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
+            parseExcelData(json,sheetName);
+        }catch(err){
+            setUploadStatus('Erro ao processar: '+err.message,'error');
+            console.error(err);
         }
+    };
+    reader.readAsArrayBuffer(file);
+}
 
-        const results = [];
-        PORTFOLIO.classes.forEach(c => {
-            const targetPct = rebalTargets[c.nome] || 0;
-            const currentValue = (c.alocacao / 100) * PORTFOLIO.totalBruto;
-            const targetValue = (targetPct / 100) * PORTFOLIO.totalBruto;
-            const diff = targetValue - currentValue;
+function parseExcelData(rows,sheetName) {
+    // Detect header row
+    let headerIdx=-1;
+    for(let i=0;i<Math.min(rows.length,20);i++){
+        const rowStr=rows[i].map(c=>String(c).toLowerCase()).join('|');
+        const checks=[(rowStr.includes('ativos')&&rowStr.includes('carteira')),rowStr.includes('codigo')||rowStr.includes('código'),rowStr.includes('saldo bruto'),rowStr.includes('valor aplicado')];
+        if(checks.filter(Boolean).length>=3){headerIdx=i;break;}
+    }
+    if(headerIdx===-1){setUploadStatus('Cabecalho nao encontrado. Verifique se o formato e compativel.','error');return;}
 
-            results.push({
-                classe: c.nome,
-                cor: c.cor,
-                atual: c.alocacao,
-                alvo: targetPct,
-                valorAtual: currentValue,
-                valorAlvo: targetValue,
-                movimentacao: diff
-            });
+    const headers=rows[headerIdx].map(h=>String(h).trim());
+    // Map columns
+    function findCol(keywords){return headers.findIndex(h=>{const hl=h.toLowerCase();return keywords.some(k=>hl.includes(k));});}
+    const colMap={
+        nome:findCol(['ativos','carteira']),codigo:findCol(['código','codigo']),emissor:findCol(['emissor']),
+        tipo:findCol(['tipo']),indexador:findCol(['indexador','taxa']),empresa:findCol(['empresa']),
+        valAplicado:findCol(['valor aplicado']),saldoBruto:findCol(['saldo bruto']),
+        ir:findCol(['ir (r','ir(r']),iof:findCol(['iof']),saldoLiquido:findCol(['saldo líquido','saldo liquido']),
+        alocacao:findCol(['alocação','alocacao']),vencimento:findCol(['vencimento']),
+    };
+    // Find rentab columns
+    const rentabCols={};
+    headers.forEach((h,i)=>{
+        const hl=h.toLowerCase();
+        if(hl.includes('rentab')){
+            if(hl.includes('dez'))rentabCols.dez25=i;
+            else if(hl.includes('nov'))rentabCols.nov25=i;
+            else if(hl.includes('2025'))rentabCols.ano2025=i;
+            else if(hl.includes('2024'))rentabCols.ano2024=i;
+            else if(hl.includes('6m'))rentabCols.m6=i;
+            else if(hl.includes('12m'))rentabCols.m12=i;
+        }
+    });
+
+    // Process data rows
+    const VALID_CLASSES=['Renda fixa e estruturados','Fundos de investimento','Previdência','Previdencia','Renda variável e Fundos imobiliários','Renda variavel e Fundos imobiliarios','Carteira','Saldo em conta corrente','Pós-fixado','Pos-fixado','Prefixado','Inflação','Inflacao','Multimercado','Renda Variável','Renda Variavel','Internacional'];
+    let currentClass=null; const classes={};
+    for(let i=headerIdx+1;i<rows.length;i++){
+        const row=rows[i]; const nome=String(row[colMap.nome]||'').trim();
+        if(!nome)continue;
+        // Check if class header
+        if(VALID_CLASSES.some(vc=>nome.toLowerCase()===vc.toLowerCase())){currentClass=nome;if(!classes[currentClass])classes[currentClass]={ativos:[],saldoBruto:0};continue;}
+        // Skip totals
+        if(nome.toLowerCase().includes('total')||nome.toLowerCase().includes('subtotal'))continue;
+        if(!currentClass)continue;
+        // Parse asset
+        const parseBRL=v=>{if(v==null||v==='')return 0;let s=String(v).replace(/R\$|\s/g,'');if(s.startsWith('(')&&s.endsWith(')'))s='-'+s.slice(1,-1);s=s.replace(/\./g,'').replace(',','.');return parseFloat(s)||0;};
+        const parsePct=v=>{if(v==null||v==='')return null;let s=String(v).replace('%','').replace(',','.');const n=parseFloat(s);return isNaN(n)?null:n;};
+        const rentab={};
+        Object.entries(rentabCols).forEach(([k,ci])=>{rentab[k]=parsePct(row[ci]);});
+        const asset={
+            nome,codigo:String(row[colMap.codigo]||''),emissor:String(row[colMap.emissor]||''),
+            tipo:String(row[colMap.tipo]||'-'),indexador:String(row[colMap.indexador]||'-'),
+            empresa:String(row[colMap.empresa]||''),
+            valAplicado:parseBRL(row[colMap.valAplicado]),saldoBruto:parseBRL(row[colMap.saldoBruto]),
+            ir:parseBRL(row[colMap.ir]),iof:parseBRL(row[colMap.iof]),saldoLiquido:parseBRL(row[colMap.saldoLiquido]),
+            alocacao:parsePct(row[colMap.alocacao])||0,
+            vencimento:row[colMap.vencimento]?String(row[colMap.vencimento]):null,
+            dataInicio:null,rentab
+        };
+        if(asset.saldoBruto>0||asset.saldoLiquido>0){
+            classes[currentClass].ativos.push(asset);
+            classes[currentClass].saldoBruto+=asset.saldoBruto;
+        }
+    }
+
+    // Build new PORTFOLIO classes
+    const colors=['#3b82f6','#8b5cf6','#10b981','#ef4444','#f59e0b','#06b6d4','#ec4899','#f97316'];
+    const newClasses=[];let ci=0;
+    const totalBruto=Object.values(classes).reduce((s,c)=>s+c.saldoBruto,0);
+    Object.entries(classes).forEach(([nome,data])=>{
+        if(data.ativos.length===0)return;
+        const sB=data.ativos.reduce((s,a)=>s+a.saldoBruto,0);
+        const sL=data.ativos.reduce((s,a)=>s+a.saldoLiquido,0);
+        const ir=data.ativos.reduce((s,a)=>s+a.ir,0);
+        const iof=data.ativos.reduce((s,a)=>s+a.iof,0);
+        const aloc=totalBruto>0?(sB/totalBruto)*100:0;
+        // Weighted rentab
+        const rentab={};
+        ['dez25','nov25','ano2025','ano2024','m6','m12'].forEach(p=>{
+            let tw=0,wr=0;
+            data.ativos.forEach(a=>{if(a.rentab[p]!=null&&a.alocacao>0){wr+=a.rentab[p]*a.alocacao;tw+=a.alocacao;}});
+            rentab[p]=tw>0?wr/tw:null;
         });
+        newClasses.push({nome,cor:colors[ci%colors.length],saldoBruto:sB,ir,iof,saldoLiquido:sL,alocacao:parseFloat(aloc.toFixed(2)),rentab,ativos:data.ativos,estimated:false});
+        ci++;
+    });
 
-        const container = document.getElementById('rebalancingResults');
-        container.innerHTML = `
-            <div style="font-size: 0.82rem; margin-bottom: 12px; color: var(--text-secondary);">
-                Movimentações necessárias para atingir a alocação alvo:
-            </div>
-            ${results.filter(r => Math.abs(r.movimentacao) > 100).map(r => `
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);">
-                    <div style="font-size: 0.85rem;">
-                        <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${r.cor};margin-right:6px;"></span>
-                        ${r.classe}
-                    </div>
-                    <div style="text-align: right;">
-                        <div class="${r.movimentacao > 0 ? 'positive' : 'negative'}" style="font-weight: 600; font-size: 0.9rem;">
-                            ${r.movimentacao > 0 ? 'Comprar' : 'Vender'} ${fmtBRL(Math.abs(r.movimentacao))}
-                        </div>
-                        <div style="font-size: 0.75rem; color: var(--text-muted);">
-                            ${fmt(r.atual)}% → ${fmt(r.alvo)}%
-                        </div>
-                    </div>
-                </div>
-            `).join('')}
-            ${results.filter(r => Math.abs(r.movimentacao) <= 100).length > 0 ? `
-                <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 8px;">
-                    ${results.filter(r => Math.abs(r.movimentacao) <= 100).length} classe(s) já dentro do alvo.
-                </div>
-            ` : ''}
-        `;
+    if(newClasses.length===0){setUploadStatus('Nenhum ativo encontrado. Verifique o formato do arquivo.','error');return;}
 
-        // Rebalance chart
-        const ctx = document.getElementById('rebalanceChart').getContext('2d');
-        if (rebalanceChartInstance) rebalanceChartInstance.destroy();
+    // Update PORTFOLIO
+    PORTFOLIO.classes=newClasses;
+    PORTFOLIO.totalBruto=totalBruto;
+    PORTFOLIO.totalLiquido=newClasses.reduce((s,c)=>s+c.saldoLiquido,0);
+    PORTFOLIO.totalIR=newClasses.reduce((s,c)=>s+c.ir,0);
 
-        rebalanceChartInstance = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: results.map(r => r.classe),
-                datasets: [
-                    {
-                        label: 'Alocação Atual',
-                        data: results.map(r => r.atual),
-                        backgroundColor: results.map(r => r.cor + '66'),
-                        borderColor: results.map(r => r.cor),
-                        borderWidth: 1,
-                        borderRadius: 3
-                    },
-                    {
-                        label: 'Alocação Alvo',
-                        data: results.map(r => r.alvo),
-                        backgroundColor: results.map(r => r.cor + 'cc'),
-                        borderColor: results.map(r => r.cor),
-                        borderWidth: 2,
-                        borderRadius: 3,
-                        borderDash: [5, 5]
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: true,
-                plugins: {
-                    legend: { position: 'top', labels: { color: '#94a3b8', font: { size: 11 } } }
-                },
-                scales: {
-                    y: {
-                        grid: { color: 'rgba(51,65,85,0.5)' },
-                        ticks: { color: '#94a3b8', callback: v => v + '%' }
-                    },
-                    x: {
-                        grid: { display: false },
-                        ticks: { color: '#f1f5f9', font: { size: 10 } }
-                    }
-                }
-            }
-        });
-    }
+    // Reset rebal targets
+    PORTFOLIO.classes.forEach(c=>{rebalTargets[c.nome]=c.alocacao;});
 
-    // ==========================================
-    // PERIOD SELECTOR HELPER
-    // ==========================================
+    // Update strategies targets dynamically
+    STRATEGIES.forEach(s=>{if(s.targets){const nt={};PORTFOLIO.classes.forEach(c=>{nt[c.nome]=s.targets[c.nome]||c.alocacao;});s.targets=nt;}});
 
-    function renderPeriodSelector(containerId, activePeriod, callback) {
-        const container = document.getElementById(containerId);
-        const periods = ['dez25', 'nov25', 'ano2025', 'ano2024', 'm6', 'm12'];
-        container.innerHTML = periods.map(p => `
-            <div class="period-btn ${p === activePeriod ? 'active' : ''}"
-                 onclick="this.parentElement.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); window['${containerId}Callback']('${p}');">
-                ${PERIODS[p].short}
-            </div>
-        `).join('');
-        window[containerId + 'Callback'] = callback;
-    }
+    setUploadStatus(`Sucesso! ${newClasses.reduce((s,c)=>s+c.ativos.length,0)} ativos em ${newClasses.length} classes carregados da aba "${sheetName}".`,'success');
 
-    // ==========================================
-    // INITIALIZATION
-    // ==========================================
+    // Preview
+    document.getElementById('uploadPreview').innerHTML=`<div class="card"><div class="card-title">Resumo do Upload</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">${newClasses.map(c=>`<div style="padding:10px;border:1px solid var(--border);border-radius:8px;border-left:4px solid ${c.cor}"><div style="font-size:0.85rem;font-weight:600">${c.nome}</div><div style="font-size:0.78rem;color:var(--text-secondary)">${c.ativos.length} ativos | ${fmt(c.alocacao)}%</div><div style="font-size:0.82rem">${fmtBRL(c.saldoBruto)}</div></div>`).join('')}</div></div>`;
 
-    function init() {
-        renderKPIs();
-        renderInsights();
-        createAllocationChart();
-        createClassPerformanceChart();
-        createBenchmarkChart();
-        createAlphaChart();
-        renderBenchmarkTable();
-        createAssetDetailChart();
-        renderClassTabs();
-        renderAssetsTable();
-        renderRiskMetrics();
-        renderRebalancingInputs();
-    }
+    // Rebuild everything
+    rebuildAll();
+}
 
-    document.addEventListener('DOMContentLoaded', init);
-    </script>
+// ==========================================
+// PERIOD SELECTOR HELPER
+// ==========================================
+function renderPeriodSelector(id,active,cb){
+    const c=document.getElementById(id);if(!c)return;
+    const ps=['dez25','nov25','ano2025','ano2024','m6','m12'];
+    c.innerHTML=ps.map(p=>`<div class="period-btn ${p===active?'active':''}" onclick="this.parentElement.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');window['${id}CB']('${p}')">${PERIODS[p].short}</div>`).join('');
+    window[id+'CB']=cb;
+}
+
+// ==========================================
+// REBUILD
+// ==========================================
+function rebuildCharts(){
+    createAllocationChart();createClassPerformanceChart();createBenchmarkChart();createAlphaChart();createAssetDetailChart();createCdiCurveChart();
+}
+function rebuildAll(){
+    renderKPIs();renderInsights();createAllocationChart();createClassPerformanceChart();createBenchmarkChart();createAlphaChart();
+    renderBenchmarkTable();createAssetDetailChart();renderClassTabs();renderAssetsTable();renderRiskMetrics();
+    renderRebalancingInputs();renderStrategyCards();renderMaturityCalendar();
+}
+
+// ==========================================
+// INIT
+// ==========================================
+function init(){
+    loadTheme();rebuildAll();
+    renderCopomGrid();createCdiCurveChart();renderCdiImpact();
+    initUpload();
+}
+document.addEventListener('DOMContentLoaded',init);
+</script>
 </body>
 </html>
