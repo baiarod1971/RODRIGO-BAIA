@@ -431,37 +431,28 @@ const PORTFOLIO = {
                 { nome: "LCI-PRE ITAU 12,24 11/2026", codigo: "-", emissor: "ITAU", tipo: "PRE", indexador: "PRE 12,24", empresa: "Tesouraria Itau", valAplicado: 300000, saldoBruto: 342483.80, ir: 0, iof: 0, saldoLiquido: 342483.80, alocacao: 1.27, vencimento: "11/2026", dataInicio: "04/11/24", rentab: { dez25: 1.27, nov25: 1.04, ano2025: 14.28, ano2024: 2.13, m6: 6.99, m12: 14.28 } }
             ]
         },
-        { nome: "Multimercado", cor: "#10b981", saldoBruto: null, ir: null, iof: null, saldoLiquido: null, alocacao: 12.00, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true },
-        { nome: "Renda Variavel", cor: "#ef4444", saldoBruto: null, ir: null, iof: null, saldoLiquido: null, alocacao: 10.00, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true },
-        { nome: "Inflacao (IPCA+)", cor: "#f59e0b", saldoBruto: null, ir: null, iof: null, saldoLiquido: null, alocacao: 8.05, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true },
-        { nome: "Internacional", cor: "#06b6d4", saldoBruto: null, ir: null, iof: null, saldoLiquido: null, alocacao: 4.00, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true },
-        { nome: "Caixa/Liquidez", cor: "#64748b", saldoBruto: null, ir: null, iof: null, saldoLiquido: null, alocacao: 2.00, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true }
+        { nome: "Inflacao", cor: "#f59e0b", saldoBruto: 8127199.45, ir: 373857, iof: 0, saldoLiquido: 7753342.45, alocacao: 30.21, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true },
+        { nome: "Renda Fixa Ativo", cor: "#ef4444", saldoBruto: 60801.69, ir: 2797, iof: 0, saldoLiquido: 58004.69, alocacao: 0.23, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true },
+        { nome: "Multimercado", cor: "#10b981", saldoBruto: 1327212.66, ir: 61030, iof: 0, saldoLiquido: 1266182.66, alocacao: 4.93, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true },
+        { nome: "Alternativos Liquidos", cor: "#06b6d4", saldoBruto: 184050.65, ir: 8463, iof: 0, saldoLiquido: 175587.65, alocacao: 0.68, rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null }, ativos: [], estimated: true }
     ]
 };
 
-// Calculate estimated values
+// Calculate totals from real data
 (function() {
-    const totalBruto = PORTFOLIO.classes[0].saldoBruto / (PORTFOLIO.classes[0].alocacao / 100);
-    PORTFOLIO.classes.forEach(c => {
-        if (c.estimated) {
-            c.saldoBruto = totalBruto * (c.alocacao / 100);
-            c.saldoLiquido = c.saldoBruto * 0.9;
-            c.ir = c.saldoBruto * 0.1; c.iof = 0;
-        }
-    });
-    PORTFOLIO.totalBruto = totalBruto;
+    PORTFOLIO.totalBruto = PORTFOLIO.classes.reduce((s, c) => s + (c.saldoBruto || 0), 0);
     PORTFOLIO.totalLiquido = PORTFOLIO.classes.reduce((s, c) => s + (c.saldoLiquido || 0), 0);
     PORTFOLIO.totalIR = PORTFOLIO.classes.reduce((s, c) => s + (c.ir || 0), 0);
 })();
 
 // Benchmarks
 const BENCHMARKS = {
-    CDI: { dez25: 1.12, nov25: 0.79, ano2025: 14.15, ano2024: 10.76, m6: 7.02, m12: 14.15, label: "CDI", cor: "#f59e0b" },
-    IPCA: { dez25: 0.52, nov25: 0.39, ano2025: 4.83, ano2024: 4.83, m6: 2.80, m12: 4.83, label: "IPCA", cor: "#ef4444" },
-    SELIC: { dez25: 1.12, nov25: 0.79, ano2025: 14.25, ano2024: 10.87, m6: 7.10, m12: 14.25, label: "SELIC", cor: "#10b981" },
-    DOLAR: { dez25: -1.5, nov25: 3.8, ano2025: -8.00, ano2024: 27.34, m6: -6.0, m12: -8.00, label: "Dolar", cor: "#06b6d4" },
-    IBOVESPA: { dez25: -4.3, nov25: -3.1, ano2025: 12.00, ano2024: -10.36, m6: 2.5, m12: 12.00, label: "Ibovespa", cor: "#ec4899" },
-    IPCACDI: { dez25: 1.64, nov25: 1.18, ano2025: 19.66, ano2024: 16.11, m6: 10.02, m12: 19.66, label: "IPCA+CDI", cor: "#f97316" }
+    CDI: { dez25: 1.22, nov25: 0.79, ano2025: 14.31, ano2024: 10.76, m6: 7.02, m12: 14.31, label: "CDI", cor: "#f59e0b" },
+    IPCA: { dez25: 0.33, nov25: 0.39, ano2025: 4.26, ano2024: 4.26, m6: 2.80, m12: 4.26, label: "IPCA", cor: "#ef4444" },
+    SELIC: { dez25: 1.22, nov25: 0.79, ano2025: 14.31, ano2024: 10.87, m6: 7.10, m12: 14.31, label: "SELIC", cor: "#10b981" },
+    DOLAR: { dez25: 3.16, nov25: 3.8, ano2025: -11.03, ano2024: 27.34, m6: -6.0, m12: -11.03, label: "Dolar", cor: "#06b6d4" },
+    IBOVESPA: { dez25: 3.18, nov25: -3.1, ano2025: 37.29, ano2024: -10.36, m6: 2.5, m12: 37.29, label: "Ibovespa", cor: "#ec4899" },
+    IPCACDI: { dez25: 1.55, nov25: 1.18, ano2025: 19.18, ano2024: 15.48, m6: 10.02, m12: 19.18, label: "IPCA+CDI", cor: "#f97316" }
 };
 
 const PERIODS = {
@@ -490,13 +481,13 @@ const DEFAULT_COPOM = JSON.parse(JSON.stringify(COPOM_MEETINGS));
 const STRATEGIES = [
     { id: 'manual', name: 'Manual', desc: 'Defina alvos manualmente', icon: '&#9998;', targets: null },
     { id: 'cdi_optimized', name: 'CDI-Otimizado', desc: 'Baseado na curva de juros projetada', icon: '&#128200;',
-      targets: { 'Pos-fixado': 42, 'Prefixado': 20, 'Multimercado': 12, 'Renda Variavel': 10, 'Inflacao (IPCA+)': 10, 'Internacional': 4, 'Caixa/Liquidez': 2 } },
+      targets: { 'Pos-fixado': 40, 'Prefixado': 18, 'Inflacao': 35, 'Renda Fixa Ativo': 0.5, 'Multimercado': 5.5, 'Alternativos Liquidos': 1 } },
     { id: 'conservative', name: 'Conservador', desc: 'Maximizar seguranca e liquidez', icon: '&#128737;',
-      targets: { 'Pos-fixado': 55, 'Prefixado': 10, 'Multimercado': 10, 'Renda Variavel': 5, 'Inflacao (IPCA+)': 12, 'Internacional': 3, 'Caixa/Liquidez': 5 } },
+      targets: { 'Pos-fixado': 55, 'Prefixado': 10, 'Inflacao': 28, 'Renda Fixa Ativo': 0.5, 'Multimercado': 5.5, 'Alternativos Liquidos': 1 } },
     { id: 'balanced', name: 'Equilibrado', desc: 'Balancear risco e retorno', icon: '&#9878;',
-      targets: { 'Pos-fixado': 35, 'Prefixado': 15, 'Multimercado': 15, 'Renda Variavel': 15, 'Inflacao (IPCA+)': 10, 'Internacional': 7, 'Caixa/Liquidez': 3 } },
+      targets: { 'Pos-fixado': 40, 'Prefixado': 15, 'Inflacao': 30, 'Renda Fixa Ativo': 0.5, 'Multimercado': 10, 'Alternativos Liquidos': 4.5 } },
     { id: 'aggressive', name: 'Arrojado', desc: 'Maximizar retorno com mais risco', icon: '&#128640;',
-      targets: { 'Pos-fixado': 20, 'Prefixado': 15, 'Multimercado': 15, 'Renda Variavel': 25, 'Inflacao (IPCA+)': 10, 'Internacional': 12, 'Caixa/Liquidez': 3 } }
+      targets: { 'Pos-fixado': 30, 'Prefixado': 18, 'Inflacao': 30, 'Renda Fixa Ativo': 0.5, 'Multimercado': 12, 'Alternativos Liquidos': 9.5 } }
 ];
 let selectedStrategy = 'manual';
 
@@ -718,8 +709,8 @@ function renderCdiImpact() {
     const impacts=[
         {classe:'Pos-fixado',cor:'#3b82f6',signal:isRising?'positive':'negative',impact:isRising?'Favoravel: juros altos beneficiam pos-fixados no curto prazo. CDI projetado acima de 14% mantem retornos elevados.':'Atencao: queda do CDI reduzira retornos. Considere travar taxas em prefixados.',action:isRising?'Manter ou aumentar exposicao em CDI% acima de 100%':'Reduzir gradualmente; migrar para prefixados ou IPCA+'},
         {classe:'Prefixado',cor:'#8b5cf6',signal:willFall?'positive':'negative',impact:willFall?'Oportunidade: queda futura de juros gera ganho de capital (marcacao a mercado positiva) em prefixados longos.':'Risco: se juros subirem mais, prefixados longos terao marcacao negativa.',action:willFall?'Aumentar posicao em prefixados longos (2028+). Debentures infra com boa relacao risco/retorno.':'Reduzir duration; preferir prefixados curtos (2026-2027)'},
-        {classe:'Inflacao (IPCA+)',cor:'#f59e0b',signal:'positive',impact:'Protecao contra inflacao + juros reais historicamente altos. NTN-Bs longas oferecem taxa real atrativa.',action:'Considerar aumento para 10-12% da carteira. Preferir NTN-B com vencimento 2030-2035.'},
-        {classe:'Renda Variavel',cor:'#ef4444',signal:willFall?'positive':'negative',impact:willFall?'Potencial de valorizacao: queda de juros reduz taxa de desconto e favorece acoes.':'Competicao com RF: juros altos tornam RF mais atrativa vs acoes.',action:willFall?'Aumentar gradualmente. Focar em empresas com receita previsivel e dividendos.':'Manter posicao defensiva. Preferir FIIs com yield acima do CDI.'}
+        {classe:'Inflacao',cor:'#f59e0b',signal:'positive',impact:'Maior classe apos pos-fixado (30,21%). Protecao contra inflacao + juros reais historicamente altos. NTN-Bs longas oferecem taxa real atrativa.',action:'Manter alocacao robusta. Com juros reais elevados, titulos IPCA+ longos sao atrativos para preservacao de patrimonio.'},
+        {classe:'Multimercado',cor:'#10b981',signal:willFall?'positive':'negative',impact:willFall?'Potencial de valorizacao: queda de juros favorece estrategias de gestao ativa e arbitragem.':'Competicao com RF: juros altos tornam renda fixa mais atrativa vs fundos multimercado.',action:willFall?'Considerar aumento gradual. Focar em fundos com historico consistente de alpha.':'Manter posicao atual. Selecionar fundos com baixa correlacao ao CDI.'}
     ];
     c.innerHTML=`<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">${impacts.map(i=>`<div class="insight-card" style="border-left:4px solid ${i.cor}"><h4 style="color:${i.cor}">${i.classe} <span class="${i.signal}" style="font-size:0.75rem">${i.signal==='positive'?'&#9650; FAVORAVEL':'&#9660; ATENCAO'}</span></h4><p>${i.impact}</p><p style="margin-top:8px;font-size:0.78rem;color:var(--text-primary)"><strong>Sugestao:</strong> ${i.action}</p></div>`).join('')}</div>`;
 }
@@ -847,7 +838,7 @@ function parseExcelData(rows,sheetName) {
     });
 
     // Process data rows
-    const VALID_CLASSES=['Renda fixa e estruturados','Fundos de investimento','Previdência','Previdencia','Renda variável e Fundos imobiliários','Renda variavel e Fundos imobiliarios','Carteira','Saldo em conta corrente','Pós-fixado','Pos-fixado','Prefixado','Inflação','Inflacao','Multimercado','Renda Variável','Renda Variavel','Internacional'];
+    const VALID_CLASSES=['Renda fixa e estruturados','Fundos de investimento','Previdência','Previdencia','Renda variável e Fundos imobiliários','Renda variavel e Fundos imobiliarios','Carteira','Saldo em conta corrente','Pós-fixado','Pos-fixado','Prefixado','Inflação','Inflacao','Multimercado','Renda Variável','Renda Variavel','Internacional','Renda Fixa Ativo','Alternativos Líquidos','Alternativos Liquidos'];
     let currentClass=null; const classes={};
     for(let i=headerIdx+1;i<rows.length;i++){
         const row=rows[i]; const nome=String(row[colMap.nome]||'').trim();
