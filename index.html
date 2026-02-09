@@ -455,11 +455,16 @@ const BENCHMARKS = {
     IPCACDI: { dez25: 1.55, nov25: 1.18, ano2025: 19.18, ano2024: 15.48, m6: 10.02, m12: 19.18, label: "IPCA+CDI", cor: "#f97316" }
 };
 
-const PERIODS = {
-    dez25: { label: "Dez/25", short: "Dez" }, nov25: { label: "Nov/25", short: "Nov" },
+let PERIODS = {
+    dez25: { label: "Dez/25", short: "Dez/25" }, nov25: { label: "Nov/25", short: "Nov/25" },
     ano2025: { label: "Ano 2025", short: "2025" }, ano2024: { label: "Ano 2024", short: "2024" },
     m6: { label: "6 Meses", short: "6M" }, m12: { label: "12 Meses", short: "12M" }
 };
+function getPeriodKeys() { return Object.keys(PERIODS); }
+function validPeriod(p) { return PERIODS[p] ? p : getPeriodKeys()[0]; }
+function getAnnualPeriod() { return getPeriodKeys().find(k => k.startsWith('ano')) || getPeriodKeys()[0]; }
+function getMonthPeriod() { return getPeriodKeys().find(k => !k.startsWith('ano') && !k.startsWith('m')) || getPeriodKeys()[0]; }
+const MONTH_LABELS = {jan:'Jan',fev:'Fev',mar:'Mar',abr:'Abr',mai:'Mai',jun:'Jun',jul:'Jul',ago:'Ago',set:'Set',out:'Out',nov:'Nov',dez:'Dez'};
 
 // CDI Curve projections
 let COPOM_MEETINGS = [
@@ -534,14 +539,18 @@ function loadTheme() {
 // ==========================================
 function renderKPIs() {
     const g = document.getElementById('kpi-grid');
-    const r25 = getPortfolioWeightedReturn('ano2025'), rD = getPortfolioWeightedReturn('dez25');
-    const aC = r25!=null?r25-BENCHMARKS.CDI.ano2025:null, aI = r25!=null?r25-BENCHMARKS.IPCA.ano2025:null;
+    const aK = getAnnualPeriod(), mK = getMonthPeriod();
+    const aLabel = PERIODS[aK] ? PERIODS[aK].short : '-', mLabel = PERIODS[mK] ? PERIODS[mK].label : '-';
+    const rA = getPortfolioWeightedReturn(aK), rM = getPortfolioWeightedReturn(mK);
+    const cdiA = BENCHMARKS.CDI[aK]!=null?BENCHMARKS.CDI[aK]:null, cdiM = BENCHMARKS.CDI[mK]!=null?BENCHMARKS.CDI[mK]:null;
+    const ipcaA = BENCHMARKS.IPCA[aK]!=null?BENCHMARKS.IPCA[aK]:null;
+    const aC = rA!=null&&cdiA!=null?rA-cdiA:null, aI = rA!=null&&ipcaA!=null?rA-ipcaA:null;
     const kpis = [
         {l:"Patrimonio Bruto",v:fmtBRL(PORTFOLIO.totalBruto),s:`Liquido: ${fmtBRL(PORTFOLIO.totalLiquido)}`,c:"neutral"},
-        {l:"Rentab. 2025 (Carteira)",v:fmtPct(r25),s:`CDI: ${fmtPct(BENCHMARKS.CDI.ano2025)}`,c:colorClass(r25)},
-        {l:"Rentab. Dez/25",v:fmtPct(rD),s:`CDI: ${fmtPct(BENCHMARKS.CDI.dez25)}`,c:colorClass(rD)},
-        {l:"Alpha vs CDI (2025)",v:fmtPct(aC),s:aC>0?"Acima do CDI":"Abaixo do CDI",c:colorClass(aC)},
-        {l:"Retorno Real (vs IPCA)",v:fmtPct(aI),s:`IPCA 2025: ${fmtPct(BENCHMARKS.IPCA.ano2025)}`,c:colorClass(aI)},
+        {l:`Rentab. ${aLabel} (Carteira)`,v:fmtPct(rA),s:`CDI: ${fmtPct(cdiA)}`,c:colorClass(rA)},
+        {l:`Rentab. ${mLabel}`,v:fmtPct(rM),s:`CDI: ${fmtPct(cdiM)}`,c:colorClass(rM)},
+        {l:`Alpha vs CDI (${aLabel})`,v:fmtPct(aC),s:aC!=null&&aC>0?"Acima do CDI":"Abaixo do CDI",c:colorClass(aC)},
+        {l:"Retorno Real (vs IPCA)",v:fmtPct(aI),s:`IPCA ${aLabel}: ${fmtPct(ipcaA)}`,c:colorClass(aI)},
         {l:"IR + IOF Total",v:fmtBRL(PORTFOLIO.totalIR),s:`${fmt((PORTFOLIO.totalIR/PORTFOLIO.totalBruto)*100)}% do bruto`,c:"negative"}
     ];
     g.innerHTML=kpis.map(k=>`<div class="kpi-card"><div class="kpi-label">${k.l}</div><div class="kpi-value ${k.c}">${k.v}</div><div class="kpi-sub">${k.s}</div></div>`).join('');
@@ -557,9 +566,11 @@ function renderInsights() {
     const t5=all.slice(0,5).reduce((s,a)=>s+a.alocacao,0);
     ins.push({t:"Concentracao",p:`Os 5 maiores ativos representam ${fmt(t5)}% da carteira. ${t5>30?"Considere diversificar.":"Boa diversificacao."} Destaque: ${all[0].nome} (${fmt(all[0].alocacao)}%)`});
     const pf=PORTFOLIO.classes[0],pr=PORTFOLIO.classes[1];
-    if(pr.rentab.ano2025>pf.rentab.ano2025) ins.push({t:"Prefixado superou Pos-fixado em 2025",p:`Prefixado rendeu ${fmtPct(pr.rentab.ano2025)} vs ${fmtPct(pf.rentab.ano2025)} do Pos-fixado. O fechamento de taxa beneficiou os prefixados.`});
+    const aK=getAnnualPeriod(),aL=PERIODS[aK]?PERIODS[aK].short:'-';
+    const prevAK=getPeriodKeys().filter(k=>k.startsWith('ano'))[1];
+    if(pr.rentab[aK]>pf.rentab[aK]) ins.push({t:`Prefixado superou Pos-fixado em ${aL}`,p:`Prefixado rendeu ${fmtPct(pr.rentab[aK])} vs ${fmtPct(pf.rentab[aK])} do Pos-fixado. O fechamento de taxa beneficiou os prefixados.`});
     const btg=pr.ativos.find(a=>a.nome.includes("BTG"));
-    if(btg&&btg.rentab.ano2024<0) ins.push({t:"Atencao: Volatilidade no CRA BTG PACTUAL",p:`CRA BTG teve ${fmtPct(btg.rentab.ano2024)} em 2024, mas recuperou em 2025 (${fmtPct(btg.rentab.ano2025)}). Ativo longo (2033) com alta duration.`});
+    if(btg&&prevAK&&btg.rentab[prevAK]<0) ins.push({t:"Atencao: Volatilidade no CRA BTG PACTUAL",p:`CRA BTG teve ${fmtPct(btg.rentab[prevAK])} em ${PERIODS[prevAK]?PERIODS[prevAK].short:'-'}, mas recuperou em ${aL} (${fmtPct(btg.rentab[aK])}). Ativo longo (2033) com alta duration.`});
     const prev=pf.ativos.filter(a=>a.tipo==='Previdencia'); const prevT=prev.reduce((s,a)=>s+a.alocacao,0);
     if(prevT>0) ins.push({t:"Previdencia: Diferimento Fiscal",p:`Ativos de previdencia representam ${fmt(prevT)}% da carteira com IR diferido de ${fmtBRL(prev.reduce((s,a)=>s+(a.ir||0),0))}.`});
     ins.push({t:"Ativos Isentos de IR",p:`Diversos ativos isentos (LCA, LCI, LIG, CRI, CRA, FII, Infra). O relatorio aplica "gross up" de 15% para comparabilidade. Retornos reais sao superiores.`});
@@ -588,6 +599,7 @@ function createAllocationChart() {
 let selectedClassPeriod='ano2025';
 function createClassPerformanceChart() {
     destroyChart('classPerf');
+    selectedClassPeriod=validPeriod(selectedClassPeriod);
     const cls=PORTFOLIO.classes.filter(c=>!c.estimated);
     charts.classPerf=new Chart(document.getElementById('classPerformanceChart').getContext('2d'),{
         type:'bar',data:{labels:cls.map(c=>c.nome),datasets:[{label:'Classe',data:cls.map(c=>c.rentab[selectedClassPeriod]),backgroundColor:cls.map(c=>c.cor),borderRadius:4},{label:'CDI',data:cls.map(()=>BENCHMARKS.CDI[selectedClassPeriod]),backgroundColor:'rgba(245,158,11,0.6)',borderRadius:4}]},
@@ -599,6 +611,7 @@ function createClassPerformanceChart() {
 let selectedBenchPeriod='ano2025';
 function createBenchmarkChart() {
     destroyChart('bench');
+    selectedBenchPeriod=validPeriod(selectedBenchPeriod);
     const pr=getPortfolioWeightedReturn(selectedBenchPeriod);
     const items=[{l:'Carteira',v:pr,c:'#3b82f6'},{l:'Pos-fixado',v:PORTFOLIO.classes[0].rentab[selectedBenchPeriod],c:PORTFOLIO.classes[0].cor},{l:'Prefixado',v:PORTFOLIO.classes[1].rentab[selectedBenchPeriod],c:PORTFOLIO.classes[1].cor},...Object.values(BENCHMARKS).map(b=>({l:b.label,v:b[selectedBenchPeriod],c:b.cor}))];
     charts.bench=new Chart(document.getElementById('benchmarkChart').getContext('2d'),{
@@ -610,7 +623,7 @@ function createBenchmarkChart() {
 
 function createAlphaChart() {
     destroyChart('alpha');
-    const periods=['dez25','nov25','ano2025','ano2024','m6','m12'];
+    const periods=getPeriodKeys();
     const cls=PORTFOLIO.classes.filter(c=>!c.estimated);
     charts.alpha=new Chart(document.getElementById('alphaChart').getContext('2d'),{
         type:'line',data:{labels:periods.map(p=>PERIODS[p].short),datasets:cls.map(c=>({label:c.nome,data:periods.map(p=>c.rentab[p]!=null?c.rentab[p]-BENCHMARKS.CDI[p]:null),borderColor:c.cor,backgroundColor:c.cor+'33',fill:false,tension:0.3,pointRadius:5,spanGaps:true}))},
@@ -620,7 +633,7 @@ function createAlphaChart() {
 
 function renderBenchmarkTable() {
     const c=document.getElementById('benchmarkTable');
-    const periods=['dez25','nov25','ano2025','ano2024','m6','m12'];
+    const periods=getPeriodKeys();
     const pr={}; periods.forEach(p=>{pr[p]=getPortfolioWeightedReturn(p);});
     const rows=[{l:'Carteira (Ponderada)',d:pr,h:true},{l:'Pos-fixado',d:PORTFOLIO.classes[0].rentab},{l:'Prefixado',d:PORTFOLIO.classes[1].rentab},...Object.values(BENCHMARKS).map(b=>({l:b.label,d:b}))];
     c.innerHTML=`<table><thead><tr><th></th>${periods.map(p=>`<th class="text-right">${PERIODS[p].label}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr ${r.h?'style="background:rgba(59,130,246,0.1);"':''}><td><strong>${r.l}</strong></td>${periods.map(p=>`<td class="text-right ${colorClass(r.d[p])}"><strong>${fmtPct(r.d[p])}</strong></td>`).join('')}</tr>`).join('')}<tr class="subtotal"><td><strong>Alpha vs CDI</strong></td>${periods.map(p=>{const a=pr[p]!=null?pr[p]-BENCHMARKS.CDI[p]:null;return`<td class="text-right ${colorClass(a)}"><strong>${a!=null?(a>0?'+':'')+fmt(a)+'%':'-'}</strong></td>`;}).join('')}</tr></tbody></table>`;
@@ -629,6 +642,7 @@ function renderBenchmarkTable() {
 let selectedDetailPeriod='ano2025';
 function createAssetDetailChart() {
     destroyChart('detail');
+    selectedDetailPeriod=validPeriod(selectedDetailPeriod);
     const all=[];
     PORTFOLIO.classes.filter(c=>!c.estimated).forEach(c=>c.ativos.forEach(a=>{if(a.rentab[selectedDetailPeriod]!=null)all.push({n:a.nome.length>30?a.nome.substring(0,28)+'...':a.nome,r:a.rentab[selectedDetailPeriod],c:c.cor});}));
     all.sort((a,b)=>b.r-a.r);
@@ -654,8 +668,8 @@ function renderAssetsTable() {
     if(currentTableClass==='all'){PORTFOLIO.classes.filter(x=>!x.estimated).forEach(x=>x.ativos.forEach(a=>ativos.push({...a,classe:x.nome,classCor:x.cor})));}
     else{const cls=PORTFOLIO.classes.find(x=>x.nome===currentTableClass);if(cls)cls.ativos.forEach(a=>ativos.push({...a,classe:cls.nome,classCor:cls.cor}));}
     ativos.sort((a,b)=>{let va=a[sortColumn],vb=b[sortColumn];if(sortColumn.startsWith('rentab.')){const k=sortColumn.split('.')[1];va=a.rentab[k];vb=b.rentab[k];}if(va==null)va=-Infinity;if(vb==null)vb=-Infinity;return sortDir*(va-vb);});
-    const ps=['dez25','nov25','ano2025','ano2024','m6','m12'];
-    c.innerHTML=`<table><thead><tr><th onclick="doSort('nome')">Ativo</th><th onclick="doSort('classe')">Classe</th><th onclick="doSort('indexador')">Indexador</th><th class="text-right" onclick="doSort('saldoBruto')">Saldo Bruto</th><th class="text-right" onclick="doSort('saldoLiquido')">Saldo Liquido</th><th class="text-right" onclick="doSort('ir')">IR</th><th class="text-right" onclick="doSort('alocacao')">Alocacao</th>${ps.map(p=>`<th class="text-right" onclick="doSort('rentab.${p}')">R.${PERIODS[p].short}</th>`).join('')}<th>Vencimento</th></tr></thead><tbody>${ativos.map(a=>`<tr><td title="${a.nome}"><span style="display:inline-block;width:4px;height:4px;border-radius:50%;background:${a.classCor};margin-right:6px;vertical-align:middle;"></span>${a.nome.length>35?a.nome.substring(0,33)+'...':a.nome}</td><td>${a.classe}</td><td>${a.indexador||'-'}</td><td class="text-right">${fmtBRL(a.saldoBruto)}</td><td class="text-right">${fmtBRL(a.saldoLiquido)}</td><td class="text-right">${a.ir>0?fmtBRL(a.ir):'-'}</td><td class="text-right"><strong>${fmtPct(a.alocacao)}</strong></td>${ps.map(p=>`<td class="text-right ${colorClass(a.rentab[p])}"><strong>${fmtPct(a.rentab[p])}</strong></td>`).join('')}<td>${a.vencimento||'-'}</td></tr>`).join('')}</tbody></table>`;
+    const ps=getPeriodKeys();
+    c.innerHTML=`<table><thead><tr><th onclick="doSort('nome')">Ativo</th><th onclick="doSort('classe')">Classe</th><th onclick="doSort('indexador')">Indexador</th><th class="text-right" onclick="doSort('saldoBruto')">Saldo Bruto</th><th class="text-right" onclick="doSort('saldoLiquido')">Saldo Liquido</th><th class="text-right" onclick="doSort('ir')">IR</th><th class="text-right" onclick="doSort('alocacao')">Alocacao</th>${ps.map(p=>`<th class="text-right" onclick="doSort('rentab.${p}')">R.${PERIODS[p]?PERIODS[p].short:p}</th>`).join('')}<th>Vencimento</th></tr></thead><tbody>${ativos.map(a=>`<tr><td title="${a.nome}"><span style="display:inline-block;width:4px;height:4px;border-radius:50%;background:${a.classCor};margin-right:6px;vertical-align:middle;"></span>${a.nome.length>35?a.nome.substring(0,33)+'...':a.nome}</td><td>${a.classe}</td><td>${a.indexador||'-'}</td><td class="text-right">${fmtBRL(a.saldoBruto)}</td><td class="text-right">${fmtBRL(a.saldoLiquido)}</td><td class="text-right">${a.ir>0?fmtBRL(a.ir):'-'}</td><td class="text-right"><strong>${fmtPct(a.alocacao)}</strong></td>${ps.map(p=>`<td class="text-right ${colorClass(a.rentab[p])}"><strong>${fmtPct(a.rentab[p])}</strong></td>`).join('')}<td>${a.vencimento||'-'}</td></tr>`).join('')}</tbody></table>`;
 }
 function doSort(col){if(sortColumn===col)sortDir*=-1;else{sortColumn=col;sortDir=-1;}renderAssetsTable();}
 
@@ -823,18 +837,21 @@ function parseExcelData(rows,sheetName) {
         ir:findCol(['ir (r','ir(r']),iof:findCol(['iof']),saldoLiquido:findCol(['saldo líquido','saldo liquido']),
         alocacao:findCol(['alocação','alocacao']),vencimento:findCol(['vencimento']),
     };
-    // Find rentab columns
+    // Find rentab columns - dynamic detection
     const rentabCols={};
+    const orderedRentabKeys=[];
     headers.forEach((h,i)=>{
         const hl=h.toLowerCase();
-        if(hl.includes('rentab')){
-            if(hl.includes('dez'))rentabCols.dez25=i;
-            else if(hl.includes('nov'))rentabCols.nov25=i;
-            else if(hl.includes('2025'))rentabCols.ano2025=i;
-            else if(hl.includes('2024'))rentabCols.ano2024=i;
-            else if(hl.includes('6m'))rentabCols.m6=i;
-            else if(hl.includes('12m'))rentabCols.m12=i;
-        }
+        if(!hl.includes('rentab'))return;
+        // Month/year: "jan/26", "dez/25", "nov/25"
+        const mm=hl.match(/(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)\/?(\d{2})/);
+        if(mm){const k=mm[1]+mm[2];rentabCols[k]=i;orderedRentabKeys.push(k);return;}
+        // Duration: "6m", "12m", "24m", "36m"
+        const dm=hl.match(/(\d+)\s*m(?:eses|$)/);
+        if(dm){const k='m'+dm[1];rentabCols[k]=i;orderedRentabKeys.push(k);return;}
+        // Year: "2026", "2025", "2024"
+        const ym=hl.match(/\b(20\d{2})\b/);
+        if(ym){const k='ano'+ym[1];rentabCols[k]=i;orderedRentabKeys.push(k);return;}
     });
 
     // Process data rows
@@ -882,7 +899,7 @@ function parseExcelData(rows,sheetName) {
         const aloc=totalBruto>0?(sB/totalBruto)*100:0;
         // Weighted rentab
         const rentab={};
-        ['dez25','nov25','ano2025','ano2024','m6','m12'].forEach(p=>{
+        Object.keys(rentabCols).forEach(p=>{
             let tw=0,wr=0;
             data.ativos.forEach(a=>{if(a.rentab[p]!=null&&a.alocacao>0){wr+=a.rentab[p]*a.alocacao;tw+=a.alocacao;}});
             rentab[p]=tw>0?wr/tw:null;
@@ -892,6 +909,18 @@ function parseExcelData(rows,sheetName) {
     });
 
     if(newClasses.length===0){setUploadStatus('Nenhum ativo encontrado. Verifique o formato do arquivo.','error');return;}
+
+    // Detect reference date from first monthly period or data
+    if(orderedRentabKeys.length>0){
+        const mk=orderedRentabKeys.find(k=>!k.startsWith('ano')&&!k.startsWith('m'));
+        if(mk){const mm=mk.match(/^(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)(\d{2})$/);
+            if(mm){const mi={jan:1,fev:2,mar:3,abr:4,mai:5,jun:6,jul:7,ago:8,set:9,out:10,nov:11,dez:12};
+                const m=mi[mm[1]],y=2000+parseInt(mm[2]);const ld=new Date(y,m,0).getDate();
+                PORTFOLIO.dataRef=`${ld}/${String(m).padStart(2,'0')}/20${mm[2]}`;
+                const hd=document.getElementById('headerDate');if(hd)hd.textContent=PORTFOLIO.dataRef;
+            }
+        }
+    }
 
     // Update PORTFOLIO
     PORTFOLIO.classes=newClasses;
@@ -906,7 +935,21 @@ function parseExcelData(rows,sheetName) {
     // Update strategies targets dynamically
     STRATEGIES.forEach(s=>{if(s.targets){const nt={};PORTFOLIO.classes.forEach(c=>{nt[c.nome]=s.targets[c.nome]||c.alocacao;});s.targets=nt;}});
 
-    setUploadStatus(`Sucesso! ${newClasses.reduce((s,c)=>s+c.ativos.length,0)} ativos em ${newClasses.length} classes carregados da aba "${sheetName}".`,'success');
+    // Rebuild PERIODS from detected rentab columns
+    if(orderedRentabKeys.length>0){
+        const newPeriods={};
+        orderedRentabKeys.forEach(key=>{
+            const mm=key.match(/^(jan|fev|mar|abr|mai|jun|jul|ago|set|out|nov|dez)(\d{2})$/);
+            if(mm){newPeriods[key]={label:`${MONTH_LABELS[mm[1]]}/${mm[2]}`,short:`${MONTH_LABELS[mm[1]]}/${mm[2]}`};return;}
+            if(key.startsWith('ano')){newPeriods[key]={label:`Ano ${key.slice(3)}`,short:key.slice(3)};return;}
+            if(key.startsWith('m')){newPeriods[key]={label:`${key.slice(1)} Meses`,short:`${key.slice(1)}M`};return;}
+        });
+        PERIODS=newPeriods;
+        // Add missing period keys to benchmarks
+        Object.values(BENCHMARKS).forEach(b=>{Object.keys(PERIODS).forEach(pk=>{if(b[pk]===undefined)b[pk]=null;});});
+    }
+
+    setUploadStatus(`Sucesso! ${newClasses.reduce((s,c)=>s+c.ativos.length,0)} ativos em ${newClasses.length} classes carregados da aba "${sheetName}". Periodos detectados: ${orderedRentabKeys.map(k=>PERIODS[k]?PERIODS[k].short:k).join(', ')}`,'success');
 
     // Preview
     document.getElementById('uploadPreview').innerHTML=`<div class="card"><div class="card-title">Resumo do Upload</div><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">${newClasses.map(c=>`<div style="padding:10px;border:1px solid var(--border);border-radius:8px;border-left:4px solid ${c.cor}"><div style="font-size:0.85rem;font-weight:600">${c.nome}</div><div style="font-size:0.78rem;color:var(--text-secondary)">${c.ativos.length} ativos | ${fmt(c.alocacao)}%</div><div style="font-size:0.82rem">${fmtBRL(c.saldoBruto)}</div></div>`).join('')}</div></div>`;
@@ -920,8 +963,9 @@ function parseExcelData(rows,sheetName) {
 // ==========================================
 function renderPeriodSelector(id,active,cb){
     const c=document.getElementById(id);if(!c)return;
-    const ps=['dez25','nov25','ano2025','ano2024','m6','m12'];
-    c.innerHTML=ps.map(p=>`<div class="period-btn ${p===active?'active':''}" onclick="this.parentElement.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');window['${id}CB']('${p}')">${PERIODS[p].short}</div>`).join('');
+    active=validPeriod(active);
+    const ps=getPeriodKeys();
+    c.innerHTML=ps.map(p=>`<div class="period-btn ${p===active?'active':''}" onclick="this.parentElement.querySelectorAll('.period-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active');window['${id}CB']('${p}')">${PERIODS[p]?PERIODS[p].short:p}</div>`).join('');
     window[id+'CB']=cb;
 }
 
