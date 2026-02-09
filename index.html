@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Análise de Carteira - Portfolio Performance Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7"></script>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-card: #1e293b;
+            --bg-card-hover: #273549;
+            --border: #334155;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #3b82f6;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --accent-yellow: #f59e0b;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --accent-pink: #ec4899;
+            --accent-orange: #f97316;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.5;
+            min-height: 100vh;
+        }
+        .container { max-width: 1440px; margin: 0 auto; padding: 20px; }
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 20px 0; border-bottom: 1px solid var(--border); margin-bottom: 24px;
+        }
+        .header h1 { font-size: 1.5rem; font-weight: 700; }
+        .header .date { color: var(--text-secondary); font-size: 0.9rem; }
+
+        /* KPI Cards */
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px; margin-bottom: 24px;
+        }
+        .kpi-card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 20px;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.3); }
+        .kpi-label { font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+        .kpi-value { font-size: 1.5rem; font-weight: 700; }
+        .kpi-sub { font-size: 0.8rem; color: var(--text-secondary); margin-top: 4px; }
+        .positive { color: var(--accent-green); }
+        .negative { color: var(--accent-red); }
+        .neutral { color: var(--accent-blue); }
+
+        /* Section */
+        .section { margin-bottom: 28px; }
+        .section-title {
+            font-size: 1.1rem; font-weight: 600; margin-bottom: 16px;
+            padding-bottom: 8px; border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 8px;
+        }
+        .section-title .badge {
+            font-size: 0.7rem; background: var(--accent-blue); color: white;
+            padding: 2px 8px; border-radius: 20px; font-weight: 500;
+        }
+
+        /* Grid Layouts */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+        @media (max-width: 1024px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+        /* Cards */
+        .card {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: 12px; padding: 20px; position: relative;
+        }
+        .card-title { font-size: 0.9rem; font-weight: 600; margin-bottom: 16px; color: var(--text-secondary); }
+
+        /* Tables */
+        .table-container { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        thead th {
+            background: var(--bg-secondary); padding: 10px 12px; text-align: left;
+            font-weight: 600; color: var(--text-secondary); white-space: nowrap;
+            position: sticky; top: 0; z-index: 1; border-bottom: 2px solid var(--border);
+            cursor: pointer; user-select: none;
+        }
+        thead th:hover { color: var(--text-primary); }
+        tbody td { padding: 8px 12px; border-bottom: 1px solid var(--border); white-space: nowrap; }
+        tbody tr:hover { background: var(--bg-card-hover); }
+        tbody tr.subtotal { background: rgba(59,130,246,0.1); font-weight: 600; }
+        tbody tr.subtotal td { border-top: 2px solid var(--accent-blue); }
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+        .sort-icon { font-size: 0.65rem; margin-left: 4px; opacity: 0.5; }
+
+        /* Tabs */
+        .tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
+        .tab {
+            padding: 8px 16px; border-radius: 8px; cursor: pointer;
+            font-size: 0.8rem; font-weight: 500; border: 1px solid var(--border);
+            background: transparent; color: var(--text-secondary); transition: all 0.2s;
+        }
+        .tab:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+        .tab.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+
+        /* Rebalancing */
+        .rebal-row {
+            display: grid; grid-template-columns: 180px 80px 80px 100px 1fr 100px;
+            gap: 12px; align-items: center; padding: 10px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .rebal-row.header { font-weight: 600; color: var(--text-secondary); font-size: 0.8rem; }
+        .rebal-input {
+            background: var(--bg-primary); border: 1px solid var(--border);
+            border-radius: 6px; padding: 6px 10px; color: var(--text-primary);
+            font-size: 0.85rem; width: 70px; text-align: right;
+        }
+        .rebal-input:focus { outline: none; border-color: var(--accent-blue); }
+        .rebal-bar { height: 8px; border-radius: 4px; background: var(--bg-primary); position: relative; }
+        .rebal-bar-fill { height: 100%; border-radius: 4px; transition: width 0.3s; }
+        .rebal-diff { font-weight: 600; font-size: 0.85rem; }
+
+        /* Insight Cards */
+        .insight-card {
+            background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(139,92,246,0.1));
+            border: 1px solid rgba(59,130,246,0.3); border-radius: 12px;
+            padding: 16px; margin-bottom: 12px;
+        }
+        .insight-card h4 { font-size: 0.85rem; color: var(--accent-blue); margin-bottom: 6px; }
+        .insight-card p { font-size: 0.82rem; color: var(--text-secondary); }
+
+        /* Tooltips */
+        .info-tip {
+            display: inline-block; width: 16px; height: 16px; border-radius: 50%;
+            background: var(--text-muted); color: var(--bg-primary); text-align: center;
+            font-size: 0.65rem; line-height: 16px; cursor: help; font-weight: 700;
+            margin-left: 6px; vertical-align: middle;
+        }
+        .info-tip:hover + .tooltip-text { display: block; }
+        .tooltip-text {
+            display: none; position: absolute; background: var(--bg-primary);
+            border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
+            font-size: 0.75rem; color: var(--text-secondary); z-index: 10;
+            max-width: 300px; box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+        }
+
+        /* Chart containers */
+        .chart-container { position: relative; width: 100%; }
+        .chart-container.pie { max-width: 350px; margin: 0 auto; }
+
+        /* Legend custom */
+        .custom-legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; }
+        .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.78rem; color: var(--text-secondary); }
+        .legend-dot { width: 10px; height: 10px; border-radius: 3px; flex-shrink: 0; }
+
+        /* Button */
+        .btn {
+            padding: 8px 20px; border-radius: 8px; font-size: 0.85rem; font-weight: 500;
+            cursor: pointer; border: none; transition: all 0.2s;
+        }
+        .btn-primary { background: var(--accent-blue); color: white; }
+        .btn-primary:hover { background: #2563eb; }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-secondary); }
+        .btn-outline:hover { background: var(--bg-card-hover); color: var(--text-primary); }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: var(--text-muted); border-radius: 3px; }
+
+        /* Print */
+        @media print {
+            body { background: white; color: #1a1a1a; }
+            .card, .kpi-card { border: 1px solid #ddd; background: white; }
+        }
+
+        /* Period selector */
+        .period-selector { display: flex; gap: 4px; }
+        .period-btn {
+            padding: 4px 12px; border-radius: 6px; cursor: pointer; font-size: 0.75rem;
+            border: 1px solid var(--border); background: transparent; color: var(--text-secondary);
+        }
+        .period-btn.active { background: var(--accent-blue); color: white; border-color: var(--accent-blue); }
+
+        /* Highlight row */
+        .highlight-good { background: rgba(16,185,129,0.08) !important; }
+        .highlight-bad { background: rgba(239,68,68,0.08) !important; }
+
+        /* Waterfall bar */
+        .waterfall-positive { background: var(--accent-green); }
+        .waterfall-negative { background: var(--accent-red); }
+
+        .flex-between { display: flex; justify-content: space-between; align-items: center; }
+        .gap-12 { gap: 12px; }
+        .mb-8 { margin-bottom: 8px; }
+        .mb-16 { margin-bottom: 16px; }
+        .mt-16 { margin-top: 16px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <div>
+                <h1>Portfolio Performance Dashboard</h1>
+                <div style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px;">
+                    Itau Private Bank - Relatório de Performance (com gross up)
+                </div>
+            </div>
+            <div style="text-align: right;">
+                <div class="date">Data de Referência: <strong>31/12/2025</strong></div>
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 2px;">Metodologia: TWR (Time-Weighted Return)</div>
+            </div>
+        </div>
+
+        <!-- KPI Cards -->
+        <div class="kpi-grid" id="kpi-grid"></div>
+
+        <!-- Insights -->
+        <div class="section" id="insights-section"></div>
+
+        <!-- Row 1: Allocation + Performance -->
+        <div class="grid-2 mb-16" id="row-charts">
+            <div class="card">
+                <div class="card-title">Alocação por Classe de Ativo</div>
+                <div class="chart-container pie">
+                    <canvas id="allocationChart"></canvas>
+                </div>
+                <div id="allocationLegend" class="custom-legend"></div>
+            </div>
+            <div class="card">
+                <div class="card-title flex-between">
+                    Rentabilidade por Classe de Ativo
+                    <div class="period-selector" id="classPeriodSelector"></div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="classPerformanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 2: Benchmark Comparison -->
+        <div class="section">
+            <div class="section-title">Comparação com Benchmarks</div>
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-title flex-between">
+                        Carteira vs Benchmarks por Período
+                        <div class="period-selector" id="benchPeriodSelector"></div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="benchmarkChart"></canvas>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Alpha sobre CDI (%) por Classe</div>
+                    <div class="chart-container">
+                        <canvas id="alphaChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 3: Benchmark Table -->
+        <div class="section">
+            <div class="card">
+                <div class="card-title">Tabela Comparativa de Rentabilidades (%)</div>
+                <div class="table-container" id="benchmarkTable"></div>
+            </div>
+        </div>
+
+        <!-- Row 4: Detailed Performance by Class -->
+        <div class="section">
+            <div class="section-title">
+                Performance Detalhada por Classe
+                <span class="badge">Gross Up</span>
+            </div>
+            <div class="card">
+                <div class="card-title flex-between">
+                    Rentabilidade dos Ativos
+                    <div class="period-selector" id="detailPeriodSelector"></div>
+                </div>
+                <div class="chart-container">
+                    <canvas id="assetDetailChart" height="400"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Row 5: Full Assets Table -->
+        <div class="section">
+            <div class="section-title">Posição Detalhada dos Ativos</div>
+            <div class="tabs" id="classTabsContainer"></div>
+            <div class="card" style="padding: 0;">
+                <div class="table-container" style="max-height: 600px; overflow-y: auto;" id="assetsTableContainer"></div>
+            </div>
+        </div>
+
+        <!-- Row 6: Risk Metrics -->
+        <div class="section">
+            <div class="section-title">Métricas de Risco e Concentração</div>
+            <div class="grid-3" id="riskMetrics"></div>
+        </div>
+
+        <!-- Row 7: Rebalancing Tool -->
+        <div class="section">
+            <div class="section-title">Ferramenta de Rebalanceamento</div>
+            <div class="grid-2">
+                <div class="card">
+                    <div class="card-title">Definir Alocação Alvo (%)</div>
+                    <div id="rebalancingInputs"></div>
+                    <div style="margin-top: 16px; display: flex; gap: 8px;">
+                        <button class="btn btn-primary" onclick="calculateRebalancing()">Calcular Rebalanceamento</button>
+                        <button class="btn btn-outline" onclick="resetTargets()">Resetar</button>
+                    </div>
+                </div>
+                <div class="card">
+                    <div class="card-title">Movimentações Sugeridas</div>
+                    <div id="rebalancingResults">
+                        <p style="color: var(--text-muted); font-size: 0.85rem;">Defina as alocações alvo e clique em "Calcular Rebalanceamento"</p>
+                    </div>
+                    <div class="chart-container mt-16" style="max-height: 300px;">
+                        <canvas id="rebalanceChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; padding: 30px 0; color: var(--text-muted); font-size: 0.75rem; border-top: 1px solid var(--border); margin-top: 20px;">
+            <p>Dashboard gerado a partir do relatório de performance do Itaú Private Bank (31/12/2025).</p>
+            <p>Rentabilidades com gross up: simulam IR de 15% sobre ativos isentos para comparabilidade.</p>
+            <p>Rentabilidade passada não representa garantia de resultados futuros.</p>
+        </div>
+    </div>
+
+    <script>
+    // ==========================================
+    // DATA EXTRACTED FROM REPORT IMAGES
+    // ==========================================
+
+    const PORTFOLIO = {
+        dataRef: "31/12/2025",
+        metodologia: "TWR",
+        grossUp: true,
+        classes: [
+            {
+                nome: "Pós-fixado",
+                cor: "#3b82f6",
+                saldoBruto: 13281812.10,
+                ir: 1333376.31,
+                iof: 1600.84,
+                saldoLiquido: 11946834.95,
+                alocacao: 49.38,
+                rentab: { dez25: 1.35, nov25: 1.05, ano2025: 15.70, ano2024: 9.42, m6: 7.85, m12: 15.70 },
+                ativos: [
+                    { nome: "(53632) PRIVATE WEALTH IQ RF", codigo: "53632", emissor: "ITAU", tipo: "-", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: 1355943.51, quantidade: 71546.68, pu: 19.230843, saldoBruto: 1375903.01, ir: 3591.76, iof: 975.81, saldoLiquido: 1371335.44, aliqIR: null, dataInicio: "29/05/25", alocacao: 5.12, rentab: { dez25: 1.23, nov25: 1.03, ano2025: 8.64, ano2024: null, m6: 7.37, m12: null } },
+                    { nome: "(ISEN11) ISENTO MAR29CI", codigo: "ISEN11", emissor: "ITAUCOR", tipo: "-", indexador: "-", empresa: "ITAUCOR", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: 1249100.00, quantidade: 12491, pu: 108.42, saldoBruto: 1354274.22, ir: 0, iof: 0, saldoLiquido: 1354274.22, aliqIR: null, dataInicio: "05/06/25", alocacao: 5.03, rentab: { dez25: 1.59, nov25: 0.68, ano2025: 9.91, ano2024: null, m6: 8.25, m12: null } },
+                    { nome: "(KNUQ11) FII KINEA UNCI", codigo: "KNUQ11", emissor: "ITAUCOR", tipo: "-", indexador: "-", empresa: "ITAUCOR", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: 0, quantidade: 2954, pu: 105.25, saldoBruto: 310908.50, ir: 0, iof: 0, saldoLiquido: 310908.50, aliqIR: null, dataInicio: "13/03/24", alocacao: 1.16, rentab: { dez25: 2.88, nov25: 0.21, ano2025: 20.22, ano2024: 12.85, m6: 9.91, m12: 20.22 } },
+                    { nome: "CDB WILLCFI DI 119,00 05/2026", codigo: "CDB223KRV9K", emissor: "WILLCFI", tipo: "DI", indexador: "DI 119,00", empresa: "Itaú Corretora", regime: "-", emissao: "30/05/23", aplicacao: "30/05/2023", vencimento: "20/05/2026", valAplicado: 150000, quantidade: 150, pu: 1442.41163, saldoBruto: 216361.74, ir: 9954.26, iof: 0, saldoLiquido: 206407.48, aliqIR: 15, dataInicio: "13/03/24", alocacao: 0.80, rentab: { dez25: 1.45, nov25: 1.25, ano2025: 21.20, ano2024: 8.53, m6: 9.21, m12: 20.22 } },
+                    { nome: "CRI BROOKFIELD DI 1,50 01/2029", codigo: "24B0011201", emissor: "BROOKFIELD", tipo: "DI", indexador: "DI 1,50", empresa: "Itaú Corretora", regime: "-", emissao: "02/02/24", aplicacao: "02/02/2024", vencimento: "22/01/2029", valAplicado: 250000, quantidade: 250, pu: 998.421831, saldoBruto: 249605.45, ir: 0, iof: 0, saldoLiquido: 249605.45, aliqIR: null, dataInicio: "13/03/24", alocacao: 0.93, rentab: { dez25: 1.71, nov25: 1.59, ano2025: 18.49, ano2024: 13.12, m6: 9.25, m12: 18.49 } },
+                    { nome: "CRI ITAU DI 98,00 06/2027", codigo: "23F0013404", emissor: "ITAU", tipo: "DI", indexador: "DI 98,00", empresa: "Itaú Corretora", regime: "-", emissao: "19/06/23", aplicacao: "19/06/2023", vencimento: "21/06/2027", valAplicado: 1000000, quantidade: 1000, pu: 1006.62959, saldoBruto: 1006629.58, ir: 0, iof: 0, saldoLiquido: 1006629.58, aliqIR: null, dataInicio: "13/03/24", alocacao: 3.74, rentab: { dez25: 1.36, nov25: 1.27, ano2025: 16.60, ano2024: 10.45, m6: 8.24, m12: 16.60 } },
+                    { nome: "Itaú Prev High Yield II Mm Cp Pgbl", codigo: "4695", emissor: "ITAU", tipo: "-", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: null, quantidade: null, pu: 1.458579, saldoBruto: 1813421.57, ir: 494707.41, iof: 0, saldoLiquido: 1318714.16, aliqIR: null, dataInicio: "15/03/24", alocacao: 6.74, rentab: { dez25: 1.22, nov25: 1.01, ano2025: 14.49, ano2024: 8.64, m6: 7.08, m12: 14.49 } },
+                    { nome: "Itaú Privilege Rf Referenciado Di Pgbl", codigo: "4761", emissor: "ITAU", tipo: "-", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: null, quantidade: null, pu: 1.564462, saldoBruto: 1926830.24, ir: 606051.61, iof: 0, saldoLiquido: 1320778.63, aliqIR: null, dataInicio: "15/03/24", alocacao: 7.16, rentab: { dez25: 1.22, nov25: 1.03, ano2025: 14.34, ano2024: 8.52, m6: 7.37, m12: 14.34 } },
+                    { nome: "LCA-CDI ITAU 94,00 01/2028", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 94,00", empresa: "Tesouraria Itaú", regime: "-", emissao: "04/02/25", aplicacao: "04/02/2025", vencimento: "03/01/2028", valAplicado: 1422000, quantidade: 1422000, pu: 1.122303, saldoBruto: 1595915.13, ir: 0, iof: 0, saldoLiquido: 1595915.13, aliqIR: null, dataInicio: "04/02/25", alocacao: 5.93, rentab: { dez25: 1.35, nov25: 1.16, ano2025: 14.39, ano2024: null, m6: 8.20, m12: null } },
+                    { nome: "LCA-CDI ITAU 94,00 07/2028 (a)", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 94,00", empresa: "Tesouraria Itaú", regime: "-", emissao: "01/07/25", aplicacao: "01/07/2025", vencimento: "04/07/2028", valAplicado: 416955, quantidade: 416955, pu: 1.069119, saldoBruto: 445774.32, ir: 0, iof: 0, saldoLiquido: 445774.32, aliqIR: null, dataInicio: "01/07/25", alocacao: 1.66, rentab: { dez25: 1.35, nov25: 1.16, ano2025: 8.13, ano2024: null, m6: 8.13, m12: null } },
+                    { nome: "LCA-CDI ITAU 94,00 07/2028 (b)", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 94,00", empresa: "Tesouraria Itaú", regime: "-", emissao: "02/07/25", aplicacao: "02/07/2025", vencimento: "05/07/2028", valAplicado: 871000, quantidade: 871000, pu: 1.068565, saldoBruto: 930719.94, ir: 0, iof: 0, saldoLiquido: 930719.94, aliqIR: null, dataInicio: "02/07/25", alocacao: 3.46, rentab: { dez25: 1.35, nov25: 1.16, ano2025: 8.07, ano2024: null, m6: null, m12: null } },
+                    { nome: "LCI-CDI ITAU 94,00 04/2027", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 94,00", empresa: "Tesouraria Itaú", regime: "-", emissao: "03/04/25", aplicacao: "03/04/2025", vencimento: "05/04/2027", valAplicado: 44079, quantidade: 44079, pu: 1.101443, saldoBruto: 48550.50, ir: 0, iof: 0, saldoLiquido: 48550.50, aliqIR: null, dataInicio: "03/04/25", alocacao: 0.18, rentab: { dez25: 1.35, nov25: 1.16, ano2025: 11.93, ano2024: null, m6: 8.20, m12: null } },
+                    { nome: "LIG-DI ITAU CDI 101,00 08/2027", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 101,00", empresa: "Tesouraria Itaú", regime: "-", emissao: "04/06/24", aplicacao: "04/06/2024", vencimento: "23/08/2027", valAplicado: 404000.95, quantidade: 310000, pu: 1.583986, saldoBruto: 491035.76, ir: 0, iof: 0, saldoLiquido: 491035.76, aliqIR: null, dataInicio: "04/06/24", alocacao: 1.83, rentab: { dez25: 1.45, nov25: 1.25, ano2025: 17.02, ano2024: 7.27, m6: 8.82, m12: 17.02 } },
+                    { nome: "LIG-DI ITAU CDI 98,00 02/2029", codigo: "-", emissor: "ITAU", tipo: "CDI", indexador: "CDI 98,00", empresa: "Tesouraria Itaú", regime: "-", emissao: "12/12/25", aplicacao: "12/12/2025", vencimento: "01/02/2029", valAplicado: 267000.10, quantidade: 198848, pu: 1.351466, saldoBruto: 268736.31, ir: 0, iof: 625.03, saldoLiquido: 268111.28, aliqIR: null, dataInicio: "12/12/25", alocacao: 1.00, rentab: { dez25: 0.76, nov25: null, ano2025: 0.76, ano2024: null, m6: null, m12: null } },
+                    { nome: "Private Prev Advanced Mm Cp Pgbl", codigo: "1040", emissor: "ITAU", tipo: "-", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: null, quantidade: null, pu: 1.448528, saldoBruto: 1247145.83, ir: 219071.27, iof: 0, saldoLiquido: 1028074.56, aliqIR: null, dataInicio: "08/04/24", alocacao: 4.64, rentab: { dez25: 1.22, nov25: 1.11, ano2025: 15.13, ano2024: 8.41, m6: 7.47, m12: 15.13 } }
+                ]
+            },
+            {
+                nome: "Prefixado",
+                cor: "#8b5cf6",
+                saldoBruto: 3918010.94,
+                ir: 3231.59,
+                iof: 0,
+                saldoLiquido: 3914779.35,
+                alocacao: 14.57,
+                rentab: { dez25: 0.48, nov25: 1.51, ano2025: 18.50, ano2024: 2.88, m6: 6.83, m12: 18.50 },
+                ativos: [
+                    { nome: "(56103) PRÉ 2028 IV INFRA", codigo: "56103", emissor: "ITAU", tipo: "PRE", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: 270000, quantidade: null, pu: 1.168487, saldoBruto: 314675.85, ir: 0, iof: 0, saldoLiquido: 314675.85, aliqIR: null, dataInicio: "08/07/24", alocacao: 1.17, rentab: { dez25: 0.18, nov25: 1.44, ano2025: 27.14, ano2024: -6.02, m6: 8.19, m12: 27.14 } },
+                    { nome: "(56934) PRÉ 2028 II", codigo: "56934", emissor: "ITAU", tipo: "PRE", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: 228000, quantidade: null, pu: 1.180103, saldoBruto: 268854.58, ir: 0, iof: 0, saldoLiquido: 268854.58, aliqIR: null, dataInicio: "24/04/24", alocacao: 1.00, rentab: { dez25: -0.02, nov25: 1.48, ano2025: 26.78, ano2024: -4.41, m6: 7.91, m12: 26.78 } },
+                    { nome: "(58441) DEB PRÉ 2030 SHIFT", codigo: "58441", emissor: "ITAU", tipo: "PRE", indexador: "-", empresa: "Soluções Investimentos Itaú", regime: "-", emissao: null, aplicacao: null, vencimento: null, valAplicado: 300000, quantidade: null, pu: 1.024764, saldoBruto: 307287.84, ir: 0, iof: 0, saldoLiquido: 307287.84, aliqIR: null, dataInicio: "10/09/25", alocacao: 1.14, rentab: { dez25: -0.72, nov25: 2.22, ano2025: 2.86, ano2024: null, m6: null, m12: null } },
+                    { nome: "CRA BTG PACTUAL 11,96 09/2033", codigo: "CRA02300HWK", emissor: "BTG PACTUAL", tipo: "PRE", indexador: "PRE 11,96", empresa: "Itaú Corretora", regime: "-", emissao: "31/08/23", aplicacao: "31/08/2023", vencimento: "15/09/2033", valAplicado: 454000, quantidade: 454, pu: 988.559376, saldoBruto: 448805.95, ir: 0, iof: 0, saldoLiquido: 448805.95, aliqIR: null, dataInicio: "13/03/24", alocacao: 1.67, rentab: { dez25: -0.54, nov25: 4.06, ano2025: 33.28, ano2024: -13.04, m6: 7.84, m12: 33.28 } },
+                    { nome: "CRI ALLOS 11,67 04/2031", codigo: "24D0006603", emissor: "ALLOS", tipo: "PRE", indexador: "PRE 11,67", empresa: "Itaú Corretora", regime: "-", emissao: "15/04/24", aplicacao: "17/04/2024", vencimento: "15/04/2031", valAplicado: 300000, quantidade: 300, pu: 961.294872, saldoBruto: 288388.46, ir: 0, iof: 0, saldoLiquido: 288388.46, aliqIR: null, dataInicio: "17/04/24", alocacao: 1.07, rentab: { dez25: -0.53, nov25: 1.04, ano2025: 28.47, ano2024: 8.85, m6: 6.52, m12: 28.47 } },
+                    { nome: "LCA-PRE ITAU 12,55 06/2027", codigo: "-", emissor: "ITAU", tipo: "PRE", indexador: "PRE 12,55", empresa: "Tesouraria Itaú", regime: "-", emissao: null, aplicacao: "14/11/2024", vencimento: "16/06/2027", valAplicado: 250000, quantidade: 250000, pu: 1.140954, saldoBruto: 285238.49, ir: 0, iof: 0, saldoLiquido: 285238.49, aliqIR: null, dataInicio: "14/11/24", alocacao: 1.06, rentab: { dez25: 1.25, nov25: 1.06, ano2025: 14.58, ano2024: 1.79, m6: 7.14, m12: 14.58 } },
+                    { nome: "LCI-PRE ITAU 10,30 06/2026", codigo: "-", emissor: "ITAU", tipo: "PRE", indexador: "PRE 10,30", empresa: "Tesouraria Itaú", regime: "-", emissao: null, aplicacao: "14/06/2024", vencimento: "15/06/2026", valAplicado: 300000, quantidade: 300000, pu: 1.162929, saldoBruto: 348878.72, ir: 0, iof: 0, saldoLiquido: 348878.72, aliqIR: null, dataInicio: "14/06/24", alocacao: 1.30, rentab: { dez25: 1.05, nov25: 0.88, ano2025: 12.05, ano2024: 6.46, m6: 5.93, m12: 12.05 } },
+                    { nome: "LCI-PRE ITAU 12,03 10/2026", codigo: "-", emissor: "ITAU", tipo: "PRE", indexador: "PRE 12,03", empresa: "Tesouraria Itaú", regime: "-", emissao: null, aplicacao: "25/10/2024", vencimento: "26/10/2026", valAplicado: 300000, quantidade: 300000, pu: 1.142477, saldoBruto: 342743.18, ir: 0, iof: 0, saldoLiquido: 342743.18, aliqIR: null, dataInicio: "25/10/24", alocacao: 1.27, rentab: { dez25: 1.20, nov25: 1.02, ano2025: 14.01, ano2024: 4.66, m6: 6.87, m12: 14.01 } },
+                    { nome: "LCI-PRE ITAU 12,24 11/2026", codigo: "-", emissor: "ITAU", tipo: "PRE", indexador: "PRE 12,24", empresa: "Tesouraria Itaú", regime: "-", emissao: null, aplicacao: "04/11/2024", vencimento: null, valAplicado: 300000, quantidade: 300000, pu: 1.141613, saldoBruto: 342483.80, ir: 0, iof: 0, saldoLiquido: 342483.80, aliqIR: null, dataInicio: "04/11/24", alocacao: 1.27, rentab: { dez25: 1.27, nov25: 1.04, ano2025: 14.28, ano2024: 2.13, m6: 6.99, m12: 14.28 } }
+                ]
+            },
+            {
+                nome: "Outras Classes",
+                cor: "#64748b",
+                saldoBruto: null,
+                ir: null,
+                iof: null,
+                saldoLiquido: null,
+                alocacao: 36.05,
+                rentab: { dez25: null, nov25: null, ano2025: null, ano2024: null, m6: null, m12: null },
+                ativos: [],
+                estimated: true
+            }
+        ]
+    };
+
+    // Calculate estimated values for "Outras Classes"
+    (function() {
+        const totalBrutoEstimated = PORTFOLIO.classes[0].saldoBruto / (PORTFOLIO.classes[0].alocacao / 100);
+        const outras = PORTFOLIO.classes[2];
+        outras.saldoBruto = totalBrutoEstimated * (outras.alocacao / 100);
+        outras.saldoLiquido = outras.saldoBruto * 0.88;
+        outras.ir = outras.saldoBruto - outras.saldoLiquido;
+        outras.iof = 0;
+        PORTFOLIO.totalBruto = totalBrutoEstimated;
+        PORTFOLIO.totalLiquido = PORTFOLIO.classes.reduce((s, c) => s + (c.saldoLiquido || 0), 0);
+        PORTFOLIO.totalIR = PORTFOLIO.classes.reduce((s, c) => s + (c.ir || 0), 0);
+    })();
+
+    // Benchmarks (approximate values for the periods shown)
+    const BENCHMARKS = {
+        CDI:       { dez25: 1.12, nov25: 0.79, ano2025: 14.15, ano2024: 10.76, m6: 7.02, m12: 14.15, label: "CDI", cor: "#f59e0b" },
+        IPCA:      { dez25: 0.52, nov25: 0.39, ano2025: 4.83,  ano2024: 4.83,  m6: 2.80, m12: 4.83,  label: "IPCA", cor: "#ef4444" },
+        SELIC:     { dez25: 1.12, nov25: 0.79, ano2025: 14.25, ano2024: 10.87, m6: 7.10, m12: 14.25, label: "SELIC", cor: "#10b981" },
+        DOLAR:     { dez25: -1.5, nov25: 3.8,  ano2025: -8.00, ano2024: 27.34, m6: -6.0, m12: -8.00, label: "Dólar", cor: "#06b6d4" },
+        IBOVESPA:  { dez25: -4.3, nov25: -3.1, ano2025: 12.00, ano2024: -10.36,m6: 2.5,  m12: 12.00, label: "Ibovespa", cor: "#ec4899" },
+        IPCACDI:   { dez25: 1.64, nov25: 1.18, ano2025: 19.66, ano2024: 16.11, m6: 10.02,m12: 19.66, label: "IPCA+CDI", cor: "#f97316" }
+    };
+
+    const PERIODS = {
+        dez25: { label: "Dez/25", short: "Dez" },
+        nov25: { label: "Nov/25", short: "Nov" },
+        ano2025: { label: "Ano 2025", short: "2025" },
+        ano2024: { label: "Ano 2024", short: "2024" },
+        m6: { label: "6 Meses", short: "6M" },
+        m12: { label: "12 Meses", short: "12M" }
+    };
+
+    // ==========================================
+    // UTILITY FUNCTIONS
+    // ==========================================
+
+    function fmt(v, decimals = 2) {
+        if (v == null || isNaN(v)) return "-";
+        return v.toLocaleString('pt-BR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+    }
+
+    function fmtBRL(v) {
+        if (v == null || isNaN(v)) return "-";
+        return "R$ " + v.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    function fmtPct(v) {
+        if (v == null || isNaN(v)) return "-";
+        return fmt(v) + "%";
+    }
+
+    function colorClass(v) {
+        if (v == null || isNaN(v)) return "";
+        return v > 0 ? "positive" : v < 0 ? "negative" : "";
+    }
+
+    function getPortfolioWeightedReturn(period) {
+        let totalWeight = 0, weightedReturn = 0;
+        PORTFOLIO.classes.forEach(c => {
+            if (c.rentab[period] != null && !c.estimated) {
+                weightedReturn += c.rentab[period] * c.alocacao;
+                totalWeight += c.alocacao;
+            }
+        });
+        return totalWeight > 0 ? weightedReturn / totalWeight : null;
+    }
+
+    // ==========================================
+    // KPI CARDS
+    // ==========================================
+
+    function renderKPIs() {
+        const grid = document.getElementById('kpi-grid');
+        const portfolioReturn2025 = getPortfolioWeightedReturn('ano2025');
+        const portfolioReturnDez = getPortfolioWeightedReturn('dez25');
+        const alphaCDI2025 = portfolioReturn2025 != null ? portfolioReturn2025 - BENCHMARKS.CDI.ano2025 : null;
+        const alphaIPCA2025 = portfolioReturn2025 != null ? portfolioReturn2025 - BENCHMARKS.IPCA.ano2025 : null;
+
+        const kpis = [
+            { label: "Patrimônio Bruto", value: fmtBRL(PORTFOLIO.totalBruto), sub: `Líquido: ${fmtBRL(PORTFOLIO.totalLiquido)}`, cls: "neutral" },
+            { label: "Rentab. 2025 (Carteira)", value: fmtPct(portfolioReturn2025), sub: `CDI: ${fmtPct(BENCHMARKS.CDI.ano2025)}`, cls: colorClass(portfolioReturn2025) },
+            { label: "Rentab. Dez/25", value: fmtPct(portfolioReturnDez), sub: `CDI: ${fmtPct(BENCHMARKS.CDI.dez25)}`, cls: colorClass(portfolioReturnDez) },
+            { label: "Alpha vs CDI (2025)", value: fmtPct(alphaCDI2025), sub: alphaCDI2025 > 0 ? "Acima do CDI" : "Abaixo do CDI", cls: colorClass(alphaCDI2025) },
+            { label: "Retorno Real (vs IPCA)", value: fmtPct(alphaIPCA2025), sub: `IPCA 2025: ${fmtPct(BENCHMARKS.IPCA.ano2025)}`, cls: colorClass(alphaIPCA2025) },
+            { label: "IR + IOF Total", value: fmtBRL(PORTFOLIO.totalIR + (PORTFOLIO.classes.reduce((s, c) => s + (c.iof || 0), 0))), sub: `${fmt(((PORTFOLIO.totalIR) / PORTFOLIO.totalBruto) * 100)}% do bruto`, cls: "negative" }
+        ];
+
+        grid.innerHTML = kpis.map(k => `
+            <div class="kpi-card">
+                <div class="kpi-label">${k.label}</div>
+                <div class="kpi-value ${k.cls}">${k.value}</div>
+                <div class="kpi-sub">${k.sub}</div>
+            </div>
+        `).join('');
+    }
+
+    // ==========================================
+    // INSIGHTS
+    // ==========================================
+
+    function renderInsights() {
+        const container = document.getElementById('insights-section');
+        const insights = [];
+
+        // Concentration
+        const topAssets = [];
+        PORTFOLIO.classes.filter(c => !c.estimated).forEach(c => {
+            c.ativos.forEach(a => topAssets.push({ nome: a.nome, alocacao: a.alocacao, saldoBruto: a.saldoBruto }));
+        });
+        topAssets.sort((a, b) => b.alocacao - a.alocacao);
+        const top5Pct = topAssets.slice(0, 5).reduce((s, a) => s + a.alocacao, 0);
+        insights.push({
+            title: "Concentração",
+            text: `Os 5 maiores ativos representam ${fmt(top5Pct)}% da carteira. ${top5Pct > 30 ? "Considere diversificar para reduzir risco de concentração." : "Boa diversificação."} Destaque: ${topAssets[0].nome} (${fmt(topAssets[0].alocacao)}%)`
+        });
+
+        // Pós vs Pré
+        const posFixado = PORTFOLIO.classes[0];
+        const preFixado = PORTFOLIO.classes[1];
+        if (preFixado.rentab.ano2025 > posFixado.rentab.ano2025) {
+            insights.push({
+                title: "Prefixado superou Pós-fixado em 2025",
+                text: `Prefixado rendeu ${fmtPct(preFixado.rentab.ano2025)} vs ${fmtPct(posFixado.rentab.ano2025)} do Pós-fixado. O fechamento de taxa beneficiou os prefixados. Com SELIC alta, prefixados longos podem continuar voláteis.`
+            });
+        }
+
+        // CRA BTG check
+        const craBtg = preFixado.ativos.find(a => a.nome.includes("BTG"));
+        if (craBtg && craBtg.rentab.ano2024 < 0) {
+            insights.push({
+                title: "Atenção: Volatilidade no CRA BTG PACTUAL",
+                text: `CRA BTG PACTUAL teve ${fmtPct(craBtg.rentab.ano2024)} em 2024 (marcação a mercado negativa), mas se recuperou fortemente em 2025 (${fmtPct(craBtg.rentab.ano2025)}). Ativo longo (vencimento 2033) com alta duration - espere volatilidade.`
+            });
+        }
+
+        // Previdência
+        const prevAtivos = posFixado.ativos.filter(a => a.nome.toLowerCase().includes('prev') || a.nome.toLowerCase().includes('pgbl'));
+        const prevTotal = prevAtivos.reduce((s, a) => s + a.alocacao, 0);
+        const prevIR = prevAtivos.reduce((s, a) => s + (a.ir || 0), 0);
+        if (prevTotal > 0) {
+            insights.push({
+                title: "Previdência: Diferimento Fiscal",
+                text: `Ativos de previdência representam ${fmt(prevTotal)}% da carteira com IR diferido de ${fmtBRL(prevIR)}. O IR sobre PGBL/VGBL incide no resgate - considere o regime tributário (regressivo vs progressivo) no planejamento.`
+            });
+        }
+
+        // Tax-exempt products
+        const taxExemptTypes = ['LCA', 'LCI', 'LIG', 'CRI', 'CRA'];
+        const exemptAtivos = [];
+        PORTFOLIO.classes.filter(c => !c.estimated).forEach(c => {
+            c.ativos.forEach(a => {
+                if (taxExemptTypes.some(t => a.nome.toUpperCase().includes(t)) || a.nome.includes('FII') || a.nome.includes('INFRA')) {
+                    exemptAtivos.push(a);
+                }
+            });
+        });
+        const exemptPct = exemptAtivos.reduce((s, a) => s + a.alocacao, 0);
+        insights.push({
+            title: "Ativos Isentos de IR",
+            text: `${fmt(exemptPct)}% da carteira está em produtos isentos de IR (LCA, LCI, LIG, CRI, CRA, FII, Infra). O relatório aplica "gross up" de 15% para comparabilidade. Retornos reais desses ativos são superiores aos mostrados.`
+        });
+
+        container.innerHTML = `
+            <div class="section-title">Insights da Carteira</div>
+            <div class="grid-2">${insights.map(i => `
+                <div class="insight-card">
+                    <h4>${i.title}</h4>
+                    <p>${i.text}</p>
+                </div>
+            `).join('')}</div>
+        `;
+    }
+
+    // ==========================================
+    // ALLOCATION CHART
+    // ==========================================
+
+    let allocationChart;
+    function createAllocationChart() {
+        const ctx = document.getElementById('allocationChart').getContext('2d');
+        const classes = PORTFOLIO.classes;
+        const colors = classes.map(c => c.cor);
+
+        allocationChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: classes.map(c => c.nome),
+                datasets: [{
+                    data: classes.map(c => c.alocacao),
+                    backgroundColor: colors,
+                    borderColor: '#1e293b',
+                    borderWidth: 3,
+                    hoverOffset: 8
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                cutout: '65%',
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => {
+                                const c = classes[ctx.dataIndex];
+                                return [
+                                    `${c.nome}: ${fmt(c.alocacao)}%`,
+                                    `Saldo Bruto: ${fmtBRL(c.saldoBruto)}`,
+                                    c.saldoLiquido ? `Saldo Líquido: ${fmtBRL(c.saldoLiquido)}` : ''
+                                ].filter(Boolean);
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Legend
+        const legend = document.getElementById('allocationLegend');
+        legend.innerHTML = classes.map(c => `
+            <div class="legend-item">
+                <div class="legend-dot" style="background: ${c.cor}"></div>
+                <span>${c.nome}: <strong>${fmt(c.alocacao)}%</strong>
+                ${c.saldoLiquido ? ` (${fmtBRL(c.saldoLiquido)})` : ' (dados não disponíveis)'}
+                </span>
+            </div>
+        `).join('');
+    }
+
+    // ==========================================
+    // CLASS PERFORMANCE CHART
+    // ==========================================
+
+    let classPerformanceChart;
+    let selectedClassPeriod = 'ano2025';
+
+    function createClassPerformanceChart() {
+        const ctx = document.getElementById('classPerformanceChart').getContext('2d');
+        const classes = PORTFOLIO.classes.filter(c => !c.estimated);
+
+        classPerformanceChart = new Chart(ctx, {
+            type: 'bar',
+            data: getClassPerformanceData(selectedClassPeriod),
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                indexAxis: 'y',
+                plugins: {
+                    legend: { display: true, position: 'top', labels: { color: '#94a3b8', font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: { label: ctx => `${ctx.dataset.label}: ${fmt(ctx.raw)}%` }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(51,65,85,0.5)' },
+                        ticks: { color: '#94a3b8', callback: v => v + '%' }
+                    },
+                    y: {
+                        grid: { display: false },
+                        ticks: { color: '#f1f5f9', font: { size: 11 } }
+                    }
+                }
+            }
+        });
+
+        renderPeriodSelector('classPeriodSelector', selectedClassPeriod, (period) => {
+            selectedClassPeriod = period;
+            classPerformanceChart.data = getClassPerformanceData(period);
+            classPerformanceChart.update();
+        });
+    }
+
+    function getClassPerformanceData(period) {
+        const classes = PORTFOLIO.classes.filter(c => !c.estimated);
+        return {
+            labels: classes.map(c => c.nome),
+            datasets: [
+                {
+                    label: 'Classe',
+                    data: classes.map(c => c.rentab[period]),
+                    backgroundColor: classes.map(c => c.cor),
+                    borderRadius: 4
+                },
+                {
+                    label: 'CDI',
+                    data: classes.map(() => BENCHMARKS.CDI[period]),
+                    backgroundColor: 'rgba(245,158,11,0.6)',
+                    borderRadius: 4
+                }
+            ]
+        };
+    }
+
+    // ==========================================
+    // BENCHMARK COMPARISON CHART
+    // ==========================================
+
+    let benchmarkChart;
+    let selectedBenchPeriod = 'ano2025';
+
+    function createBenchmarkChart() {
+        const ctx = document.getElementById('benchmarkChart').getContext('2d');
+
+        benchmarkChart = new Chart(ctx, {
+            type: 'bar',
+            data: getBenchmarkData(selectedBenchPeriod),
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: { label: ctx => `${ctx.label}: ${fmt(ctx.raw)}%` }
+                    }
+                },
+                scales: {
+                    y: {
+                        grid: { color: 'rgba(51,65,85,0.5)' },
+                        ticks: { color: '#94a3b8', callback: v => v + '%' }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#f1f5f9', font: { size: 10 }, maxRotation: 45 }
+                    }
+                }
+            }
+        });
+
+        renderPeriodSelector('benchPeriodSelector', selectedBenchPeriod, (period) => {
+            selectedBenchPeriod = period;
+            benchmarkChart.data = getBenchmarkData(period);
+            benchmarkChart.update();
+        });
+    }
+
+    function getBenchmarkData(period) {
+        const portfolioReturn = getPortfolioWeightedReturn(period);
+        const items = [
+            { label: 'Carteira (Ponderada)', value: portfolioReturn, color: '#3b82f6' },
+            { label: 'Pós-fixado', value: PORTFOLIO.classes[0].rentab[period], color: PORTFOLIO.classes[0].cor },
+            { label: 'Prefixado', value: PORTFOLIO.classes[1].rentab[period], color: PORTFOLIO.classes[1].cor },
+            ...Object.values(BENCHMARKS).map(b => ({ label: b.label, value: b[period], color: b.cor }))
+        ];
+
+        return {
+            labels: items.map(i => i.label),
+            datasets: [{
+                data: items.map(i => i.value),
+                backgroundColor: items.map(i => {
+                    const v = i.value;
+                    if (v == null) return 'rgba(100,116,139,0.3)';
+                    return i.color + (v >= 0 ? 'cc' : '88');
+                }),
+                borderRadius: 4
+            }]
+        };
+    }
+
+    // ==========================================
+    // ALPHA CHART
+    // ==========================================
+
+    let alphaChart;
+    function createAlphaChart() {
+        const ctx = document.getElementById('alphaChart').getContext('2d');
+        const periods = ['dez25', 'nov25', 'ano2025', 'ano2024', 'm6', 'm12'];
+        const periodLabels = periods.map(p => PERIODS[p].short);
+
+        const classes = PORTFOLIO.classes.filter(c => !c.estimated);
+
+        alphaChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: periodLabels,
+                datasets: classes.map(c => ({
+                    label: c.nome,
+                    data: periods.map(p => c.rentab[p] != null ? c.rentab[p] - BENCHMARKS.CDI[p] : null),
+                    borderColor: c.cor,
+                    backgroundColor: c.cor + '33',
+                    fill: false,
+                    tension: 0.3,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    spanGaps: true
+                }))
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: true, position: 'top', labels: { color: '#94a3b8', font: { size: 11 } } },
+                    tooltip: {
+                        callbacks: {
+                            label: ctx => `${ctx.dataset.label}: ${ctx.raw != null ? (ctx.raw > 0 ? '+' : '') + fmt(ctx.raw) + '% vs CDI' : 'N/A'}`
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        grid: { color: 'rgba(51,65,85,0.5)' },
+                        ticks: { color: '#94a3b8', callback: v => (v > 0 ? '+' : '') + v + '%' },
+                        title: { display: true, text: 'Alpha vs CDI (%)', color: '#64748b' }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#f1f5f9' }
+                    }
+                }
+            }
+        });
+    }
+
+    // ==========================================
+    // BENCHMARK TABLE
+    // ==========================================
+
+    function renderBenchmarkTable() {
+        const container = document.getElementById('benchmarkTable');
+        const periods = ['dez25', 'nov25', 'ano2025', 'ano2024', 'm6', 'm12'];
+        const portfolioReturn = {};
+        periods.forEach(p => { portfolioReturn[p] = getPortfolioWeightedReturn(p); });
+
+        const rows = [
+            { label: 'Carteira (Ponderada)', data: portfolioReturn, highlight: true },
+            { label: 'Pós-fixado', data: PORTFOLIO.classes[0].rentab },
+            { label: 'Prefixado', data: PORTFOLIO.classes[1].rentab },
+            ...Object.values(BENCHMARKS).map(b => ({ label: b.label, data: b }))
+        ];
+
+        container.innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th></th>
+                        ${periods.map(p => `<th class="text-right">${PERIODS[p].label}</th>`).join('')}
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.map(r => `
+                        <tr ${r.highlight ? 'style="background: rgba(59,130,246,0.1);"' : ''}>
+                            <td><strong>${r.label}</strong></td>
+                            ${periods.map(p => {
+                                const v = r.data[p];
+                                return `<td class="text-right ${colorClass(v)}"><strong>${fmtPct(v)}</strong></td>`;
+                            }).join('')}
+                        </tr>
+                    `).join('')}
+                    <tr class="subtotal">
+                        <td><strong>Alpha vs CDI</strong></td>
+                        ${periods.map(p => {
+                            const alpha = portfolioReturn[p] != null ? portfolioReturn[p] - BENCHMARKS.CDI[p] : null;
+                            return `<td class="text-right ${colorClass(alpha)}"><strong>${alpha != null ? (alpha > 0 ? '+' : '') + fmt(alpha) + '%' : '-'}</strong></td>`;
+                        }).join('')}
+                    </tr>
+                    <tr>
+                        <td><strong>Retorno Real (vs IPCA)</strong></td>
+                        ${periods.map(p => {
+                            const real = portfolioReturn[p] != null ? portfolioReturn[p] - BENCHMARKS.IPCA[p] : null;
+                            return `<td class="text-right ${colorClass(real)}"><strong>${real != null ? (real > 0 ? '+' : '') + fmt(real) + '%' : '-'}</strong></td>`;
+                        }).join('')}
+                    </tr>
+                </tbody>
+            </table>
+        `;
+    }
+
+    // ==========================================
+    // ASSET DETAIL CHART
+    // ==========================================
+
+    let assetDetailChart;
+    let selectedDetailPeriod = 'ano2025';
+
+    function createAssetDetailChart() {
+        const ctx = document.getElementById('assetDetailChart').getContext('2d');
+
+        assetDetailChart = new Chart(ctx, {
+            type: 'bar',
+            data: getAssetDetailData(selectedDetailPeriod),
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: items => {
+                                const idx = items[0].dataIndex;
+                                return items[0].label;
+                            },
+                            label: ctx => `Rentabilidade: ${fmt(ctx.raw)}%`
+                        }
+                    }
+                },
+                scales: {
+                    y: {
+                        grid: { color: 'rgba(51,65,85,0.5)' },
+                        ticks: { color: '#94a3b8', callback: v => v + '%' }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#f1f5f9', font: { size: 9 }, maxRotation: 90, minRotation: 45 }
+                    }
+                }
+            }
+        });
+
+        renderPeriodSelector('detailPeriodSelector', selectedDetailPeriod, (period) => {
+            selectedDetailPeriod = period;
+            assetDetailChart.data = getAssetDetailData(period);
+            assetDetailChart.update();
+        });
+    }
+
+    function getAssetDetailData(period) {
+        const allAssets = [];
+        PORTFOLIO.classes.filter(c => !c.estimated).forEach(c => {
+            c.ativos.forEach(a => {
+                if (a.rentab[period] != null) {
+                    allAssets.push({
+                        nome: a.nome.length > 30 ? a.nome.substring(0, 28) + '...' : a.nome,
+                        rentab: a.rentab[period],
+                        cor: c.cor,
+                        classe: c.nome
+                    });
+                }
+            });
+        });
+        allAssets.sort((a, b) => b.rentab - a.rentab);
+
+        return {
+            labels: allAssets.map(a => a.nome),
+            datasets: [{
+                data: allAssets.map(a => a.rentab),
+                backgroundColor: allAssets.map(a => a.rentab >= 0 ? a.cor + 'cc' : '#ef444488'),
+                borderRadius: 3
+            }]
+        };
+    }
+
+    // ==========================================
+    // ASSETS TABLE
+    // ==========================================
+
+    let currentTableClass = 'all';
+    let sortColumn = 'alocacao';
+    let sortDir = -1;
+
+    function renderClassTabs() {
+        const container = document.getElementById('classTabsContainer');
+        const classes = [{ nome: 'Todos', key: 'all' }, ...PORTFOLIO.classes.filter(c => !c.estimated).map(c => ({ nome: c.nome, key: c.nome }))];
+
+        container.innerHTML = classes.map(c => `
+            <div class="tab ${c.key === currentTableClass ? 'active' : ''}" onclick="switchClassTab('${c.key}')">${c.nome}</div>
+        `).join('');
+    }
+
+    function switchClassTab(key) {
+        currentTableClass = key;
+        renderClassTabs();
+        renderAssetsTable();
+    }
+
+    function renderAssetsTable() {
+        const container = document.getElementById('assetsTableContainer');
+        let ativos = [];
+
+        if (currentTableClass === 'all') {
+            PORTFOLIO.classes.filter(c => !c.estimated).forEach(c => {
+                c.ativos.forEach(a => ativos.push({ ...a, classe: c.nome, classCor: c.cor }));
+            });
+        } else {
+            const cls = PORTFOLIO.classes.find(c => c.nome === currentTableClass);
+            if (cls) cls.ativos.forEach(a => ativos.push({ ...a, classe: cls.nome, classCor: cls.cor }));
+        }
+
+        // Sort
+        ativos.sort((a, b) => {
+            let va = a[sortColumn], vb = b[sortColumn];
+            if (sortColumn.startsWith('rentab.')) {
+                const key = sortColumn.split('.')[1];
+                va = a.rentab[key];
+                vb = b.rentab[key];
+            }
+            if (va == null) va = -Infinity;
+            if (vb == null) vb = -Infinity;
+            return sortDir * (va - vb);
+        });
+
+        const periods = ['dez25', 'nov25', 'ano2025', 'ano2024', 'm6', 'm12'];
+
+        container.innerHTML = `
+            <table>
+                <thead>
+                    <tr>
+                        <th onclick="sortTable('nome')">Ativo ${sortIcon('nome')}</th>
+                        <th onclick="sortTable('classe')">Classe ${sortIcon('classe')}</th>
+                        <th onclick="sortTable('indexador')">Indexador ${sortIcon('indexador')}</th>
+                        <th class="text-right" onclick="sortTable('saldoBruto')">Saldo Bruto ${sortIcon('saldoBruto')}</th>
+                        <th class="text-right" onclick="sortTable('saldoLiquido')">Saldo Líquido ${sortIcon('saldoLiquido')}</th>
+                        <th class="text-right" onclick="sortTable('ir')">IR ${sortIcon('ir')}</th>
+                        <th class="text-right" onclick="sortTable('alocacao')">Alocação ${sortIcon('alocacao')}</th>
+                        ${periods.map(p => `<th class="text-right" onclick="sortTable('rentab.${p}')">Rentab ${PERIODS[p].short} ${sortIcon('rentab.' + p)}</th>`).join('')}
+                        <th>Vencimento</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${ativos.map(a => `
+                        <tr>
+                            <td title="${a.nome}">
+                                <span style="display:inline-block;width:4px;height:4px;border-radius:50%;background:${a.classCor};margin-right:6px;vertical-align:middle;"></span>
+                                ${a.nome.length > 35 ? a.nome.substring(0, 33) + '...' : a.nome}
+                            </td>
+                            <td>${a.classe}</td>
+                            <td>${a.indexador || '-'}</td>
+                            <td class="text-right">${fmtBRL(a.saldoBruto)}</td>
+                            <td class="text-right">${fmtBRL(a.saldoLiquido)}</td>
+                            <td class="text-right">${a.ir > 0 ? fmtBRL(a.ir) : '-'}</td>
+                            <td class="text-right"><strong>${fmtPct(a.alocacao)}</strong></td>
+                            ${periods.map(p => {
+                                const v = a.rentab[p];
+                                return `<td class="text-right ${colorClass(v)}"><strong>${fmtPct(v)}</strong></td>`;
+                            }).join('')}
+                            <td>${a.vencimento || '-'}</td>
+                        </tr>
+                    `).join('')}
+                </tbody>
+            </table>
+        `;
+    }
+
+    function sortTable(col) {
+        if (sortColumn === col) { sortDir *= -1; }
+        else { sortColumn = col; sortDir = -1; }
+        renderAssetsTable();
+    }
+
+    function sortIcon(col) {
+        if (sortColumn === col) return `<span class="sort-icon">${sortDir === 1 ? '▲' : '▼'}</span>`;
+        return '<span class="sort-icon">⇅</span>';
+    }
+
+    // ==========================================
+    // RISK METRICS
+    // ==========================================
+
+    function renderRiskMetrics() {
+        const container = document.getElementById('riskMetrics');
+        const allAtivos = [];
+        PORTFOLIO.classes.filter(c => !c.estimated).forEach(c => {
+            c.ativos.forEach(a => allAtivos.push({ ...a, classe: c.nome }));
+        });
+        allAtivos.sort((a, b) => b.alocacao - a.alocacao);
+
+        // Concentration
+        const top5 = allAtivos.slice(0, 5);
+        const top5Sum = top5.reduce((s, a) => s + a.alocacao, 0);
+        const hhi = allAtivos.reduce((s, a) => s + Math.pow(a.alocacao, 2), 0);
+
+        // Emitter concentration
+        const emitterMap = {};
+        allAtivos.forEach(a => {
+            const e = a.emissor || 'Outros';
+            emitterMap[e] = (emitterMap[e] || 0) + a.alocacao;
+        });
+        const topEmitter = Object.entries(emitterMap).sort((a, b) => b[1] - a[1])[0];
+
+        // Maturity
+        const withMaturity = allAtivos.filter(a => a.vencimento);
+        const avgYearsToMaturity = withMaturity.length > 0 ?
+            withMaturity.reduce((s, a) => {
+                const parts = a.vencimento.split('/');
+                const matDate = new Date(parts[2], parts[1] - 1, parts[0]);
+                const years = (matDate - new Date(2025, 11, 31)) / (365.25 * 24 * 60 * 60 * 1000);
+                return s + Math.max(0, years);
+            }, 0) / withMaturity.length : null;
+
+        // Tax drag
+        const taxDrag = (PORTFOLIO.totalIR / PORTFOLIO.totalBruto) * 100;
+
+        container.innerHTML = `
+            <div class="card">
+                <div class="card-title">Concentração</div>
+                <div style="margin-bottom: 12px;">
+                    <div style="font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 8px;">Top 5 Ativos: <strong class="${top5Sum > 30 ? 'negative' : 'positive'}">${fmt(top5Sum)}%</strong></div>
+                    ${top5.map(a => `
+                        <div style="display: flex; justify-content: space-between; font-size: 0.78rem; padding: 3px 0; color: var(--text-secondary);">
+                            <span>${a.nome.substring(0, 30)}</span>
+                            <strong>${fmt(a.alocacao)}%</strong>
+                        </div>
+                    `).join('')}
+                </div>
+                <div style="font-size: 0.78rem; color: var(--text-muted);">HHI: ${fmt(hhi, 0)} ${hhi < 1000 ? '(diversificado)' : hhi < 2500 ? '(moderado)' : '(concentrado)'}</div>
+            </div>
+            <div class="card">
+                <div class="card-title">Concentração por Emissor</div>
+                ${Object.entries(emitterMap).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([e, pct]) => `
+                    <div style="margin-bottom: 8px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.82rem; margin-bottom: 3px;">
+                            <span>${e}</span><strong>${fmt(pct)}%</strong>
+                        </div>
+                        <div class="rebal-bar">
+                            <div class="rebal-bar-fill" style="width: ${Math.min(pct * 1.5, 100)}%; background: ${pct > 30 ? 'var(--accent-red)' : pct > 15 ? 'var(--accent-yellow)' : 'var(--accent-green)'};"></div>
+                        </div>
+                    </div>
+                `).join('')}
+                <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 8px;">
+                    ${topEmitter ? `Maior emissor: ${topEmitter[0]} (${fmt(topEmitter[1])}%)` : ''}
+                    ${topEmitter && topEmitter[1] > 30 ? ' - Considere diversificar entre emissores.' : ''}
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-title">Outras Métricas</div>
+                <div style="font-size: 0.82rem; color: var(--text-secondary);">
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                        <span>Total de Ativos</span><strong>${allAtivos.length}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                        <span>Classes Visíveis</span><strong>${PORTFOLIO.classes.filter(c => !c.estimated).length}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                        <span>Prazo Médio (vencimento)</span><strong>${avgYearsToMaturity != null ? fmt(avgYearsToMaturity, 1) + ' anos' : 'N/A'}</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                        <span>Impacto IR (% do bruto)</span><strong class="negative">${fmt(taxDrag)}%</strong>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                        <span>Patrimônio Bruto Est.</span><strong>${fmtBRL(PORTFOLIO.totalBruto)}</strong>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    // ==========================================
+    // REBALANCING TOOL
+    // ==========================================
+
+    const rebalTargets = {};
+
+    function renderRebalancingInputs() {
+        const container = document.getElementById('rebalancingInputs');
+        const classes = PORTFOLIO.classes;
+
+        container.innerHTML = `
+            <div class="rebal-row header">
+                <div>Classe</div>
+                <div>Atual (%)</div>
+                <div>Alvo (%)</div>
+                <div>Diferença</div>
+                <div>Barra</div>
+                <div>Valor (R$)</div>
+            </div>
+            ${classes.map(c => {
+                if (!rebalTargets[c.nome]) rebalTargets[c.nome] = c.alocacao;
+                const diff = rebalTargets[c.nome] - c.alocacao;
+                return `
+                    <div class="rebal-row">
+                        <div style="font-size: 0.85rem;">
+                            <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${c.cor};margin-right:6px;"></span>
+                            ${c.nome}
+                        </div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary);">${fmt(c.alocacao)}%</div>
+                        <div>
+                            <input type="number" class="rebal-input" value="${fmt(rebalTargets[c.nome])}"
+                                   step="0.5" min="0" max="100"
+                                   onchange="updateTarget('${c.nome}', this.value)">
+                        </div>
+                        <div class="rebal-diff ${colorClass(diff)}">${diff > 0 ? '+' : ''}${fmt(diff)}%</div>
+                        <div class="rebal-bar">
+                            <div class="rebal-bar-fill" style="width: ${Math.min(rebalTargets[c.nome], 100)}%; background: ${c.cor};"></div>
+                        </div>
+                        <div style="font-size: 0.82rem; color: var(--text-secondary);">${fmtBRL((rebalTargets[c.nome] / 100) * PORTFOLIO.totalBruto)}</div>
+                    </div>
+                `;
+            }).join('')}
+            <div style="margin-top: 8px; font-size: 0.8rem; color: var(--text-muted);">
+                Total alvo: <strong id="totalTarget">${fmt(Object.values(rebalTargets).reduce((s, v) => s + v, 0))}%</strong>
+                ${Math.abs(Object.values(rebalTargets).reduce((s, v) => s + v, 0) - 100) > 0.1 ? '<span class="negative"> (deve somar 100%)</span>' : '<span class="positive"> OK</span>'}
+            </div>
+        `;
+    }
+
+    function updateTarget(classe, value) {
+        rebalTargets[classe] = parseFloat(value) || 0;
+        renderRebalancingInputs();
+    }
+
+    function resetTargets() {
+        PORTFOLIO.classes.forEach(c => { rebalTargets[c.nome] = c.alocacao; });
+        renderRebalancingInputs();
+        document.getElementById('rebalancingResults').innerHTML = '<p style="color: var(--text-muted); font-size: 0.85rem;">Defina as alocações alvo e clique em "Calcular Rebalanceamento"</p>';
+        if (rebalanceChartInstance) { rebalanceChartInstance.destroy(); rebalanceChartInstance = null; }
+    }
+
+    let rebalanceChartInstance;
+
+    function calculateRebalancing() {
+        const totalTarget = Object.values(rebalTargets).reduce((s, v) => s + v, 0);
+        if (Math.abs(totalTarget - 100) > 0.5) {
+            document.getElementById('rebalancingResults').innerHTML = `<p class="negative" style="font-size: 0.85rem;">A soma dos alvos deve ser 100%. Atual: ${fmt(totalTarget)}%</p>`;
+            return;
+        }
+
+        const results = [];
+        PORTFOLIO.classes.forEach(c => {
+            const targetPct = rebalTargets[c.nome] || 0;
+            const currentValue = (c.alocacao / 100) * PORTFOLIO.totalBruto;
+            const targetValue = (targetPct / 100) * PORTFOLIO.totalBruto;
+            const diff = targetValue - currentValue;
+
+            results.push({
+                classe: c.nome,
+                cor: c.cor,
+                atual: c.alocacao,
+                alvo: targetPct,
+                valorAtual: currentValue,
+                valorAlvo: targetValue,
+                movimentacao: diff
+            });
+        });
+
+        const container = document.getElementById('rebalancingResults');
+        container.innerHTML = `
+            <div style="font-size: 0.82rem; margin-bottom: 12px; color: var(--text-secondary);">
+                Movimentações necessárias para atingir a alocação alvo:
+            </div>
+            ${results.filter(r => Math.abs(r.movimentacao) > 100).map(r => `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border);">
+                    <div style="font-size: 0.85rem;">
+                        <span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${r.cor};margin-right:6px;"></span>
+                        ${r.classe}
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="${r.movimentacao > 0 ? 'positive' : 'negative'}" style="font-weight: 600; font-size: 0.9rem;">
+                            ${r.movimentacao > 0 ? 'Comprar' : 'Vender'} ${fmtBRL(Math.abs(r.movimentacao))}
+                        </div>
+                        <div style="font-size: 0.75rem; color: var(--text-muted);">
+                            ${fmt(r.atual)}% → ${fmt(r.alvo)}%
+                        </div>
+                    </div>
+                </div>
+            `).join('')}
+            ${results.filter(r => Math.abs(r.movimentacao) <= 100).length > 0 ? `
+                <div style="font-size: 0.78rem; color: var(--text-muted); margin-top: 8px;">
+                    ${results.filter(r => Math.abs(r.movimentacao) <= 100).length} classe(s) já dentro do alvo.
+                </div>
+            ` : ''}
+        `;
+
+        // Rebalance chart
+        const ctx = document.getElementById('rebalanceChart').getContext('2d');
+        if (rebalanceChartInstance) rebalanceChartInstance.destroy();
+
+        rebalanceChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: results.map(r => r.classe),
+                datasets: [
+                    {
+                        label: 'Alocação Atual',
+                        data: results.map(r => r.atual),
+                        backgroundColor: results.map(r => r.cor + '66'),
+                        borderColor: results.map(r => r.cor),
+                        borderWidth: 1,
+                        borderRadius: 3
+                    },
+                    {
+                        label: 'Alocação Alvo',
+                        data: results.map(r => r.alvo),
+                        backgroundColor: results.map(r => r.cor + 'cc'),
+                        borderColor: results.map(r => r.cor),
+                        borderWidth: 2,
+                        borderRadius: 3,
+                        borderDash: [5, 5]
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { position: 'top', labels: { color: '#94a3b8', font: { size: 11 } } }
+                },
+                scales: {
+                    y: {
+                        grid: { color: 'rgba(51,65,85,0.5)' },
+                        ticks: { color: '#94a3b8', callback: v => v + '%' }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { color: '#f1f5f9', font: { size: 10 } }
+                    }
+                }
+            }
+        });
+    }
+
+    // ==========================================
+    // PERIOD SELECTOR HELPER
+    // ==========================================
+
+    function renderPeriodSelector(containerId, activePeriod, callback) {
+        const container = document.getElementById(containerId);
+        const periods = ['dez25', 'nov25', 'ano2025', 'ano2024', 'm6', 'm12'];
+        container.innerHTML = periods.map(p => `
+            <div class="period-btn ${p === activePeriod ? 'active' : ''}"
+                 onclick="this.parentElement.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active')); this.classList.add('active'); window['${containerId}Callback']('${p}');">
+                ${PERIODS[p].short}
+            </div>
+        `).join('');
+        window[containerId + 'Callback'] = callback;
+    }
+
+    // ==========================================
+    // INITIALIZATION
+    // ==========================================
+
+    function init() {
+        renderKPIs();
+        renderInsights();
+        createAllocationChart();
+        createClassPerformanceChart();
+        createBenchmarkChart();
+        createAlphaChart();
+        renderBenchmarkTable();
+        createAssetDetailChart();
+        renderClassTabs();
+        renderAssetsTable();
+        renderRiskMetrics();
+        renderRebalancingInputs();
+    }
+
+    document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
