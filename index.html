@@ -507,6 +507,13 @@ function fmt(v, d=2) { if (v==null||isNaN(v)) return "-"; return v.toLocaleStrin
 function fmtBRL(v) { if (v==null||isNaN(v)) return "-"; return "R$ "+v.toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtPct(v) { if (v==null||isNaN(v)) return "-"; return fmt(v)+"%"; }
 function colorClass(v) { if (v==null||isNaN(v)) return ""; return v>0?"positive":v<0?"negative":""; }
+function parseVencimento(v) {
+    if (!v) return null;
+    const parts = v.split('/');
+    if (parts.length === 3) return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+    if (parts.length === 2) return new Date(parseInt(parts[1]), parseInt(parts[0]) - 1, 1);
+    return null;
+}
 function getPortfolioWeightedReturn(p) {
     let tw=0,wr=0;
     PORTFOLIO.classes.forEach(c=>{ if(c.rentab[p]!=null&&!c.estimated){ wr+=c.rentab[p]*c.alocacao; tw+=c.alocacao; }});
@@ -674,7 +681,7 @@ function renderRiskMetrics() {
     const topE=Object.entries(em).sort((a,b)=>b[1]-a[1]);
     const wm=all.filter(a=>a.vencimento);
     let avgY=null;
-    if(wm.length>0){avgY=wm.reduce((s,a)=>{const p=a.vencimento.split('/');const d=new Date(p[2]||2026,parseInt(p[1]||1)-1,parseInt(p[0]||1));return s+Math.max(0,(d-new Date(2025,11,31))/(365.25*86400000));},0)/wm.length;}
+    if(wm.length>0){avgY=wm.reduce((s,a)=>{const d=parseVencimento(a.vencimento);if(!d)return s;return s+Math.max(0,(d-new Date(2025,11,31))/(365.25*86400000));},0)/wm.length;}
     c.innerHTML=`
     <div class="card"><div class="card-title">Concentracao</div><div style="margin-bottom:12px"><div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:8px">Top 5: <strong class="${t5s>30?'negative':'positive'}">${fmt(t5s)}%</strong></div>${t5.map(a=>`<div style="display:flex;justify-content:space-between;font-size:0.78rem;padding:3px 0;color:var(--text-secondary)"><span>${a.nome.substring(0,30)}</span><strong>${fmt(a.alocacao)}%</strong></div>`).join('')}</div><div style="font-size:0.78rem;color:var(--text-muted)">HHI: ${fmt(hhi,0)} ${hhi<1000?'(diversificado)':hhi<2500?'(moderado)':'(concentrado)'}</div></div>
     <div class="card"><div class="card-title">Concentracao por Emissor</div>${topE.slice(0,6).map(([e,p])=>`<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;font-size:0.82rem;margin-bottom:3px"><span>${e}</span><strong>${fmt(p)}%</strong></div><div class="rebal-bar"><div class="rebal-bar-fill" style="width:${Math.min(p*1.5,100)}%;background:${p>30?'var(--accent-red)':p>15?'var(--accent-yellow)':'var(--accent-green)'}"></div></div></div>`).join('')}</div>
@@ -742,7 +749,6 @@ function renderRebalancingInputs() {
     c.innerHTML=`<div class="rebal-row header"><div>Classe</div><div>Atual</div><div>Alvo</div><div>Diff</div><div>Barra</div><div>Valor Alvo</div></div>${cls.map(x=>{const d=rebalTargets[x.nome]-x.alocacao;return`<div class="rebal-row"><div style="font-size:0.82rem"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${x.cor};margin-right:6px"></span>${x.nome}${x.estimated?' *':''}</div><div style="font-size:0.82rem;color:var(--text-secondary)">${fmt(x.alocacao)}%</div><div><input type="number" class="rebal-input" value="${fmt(rebalTargets[x.nome])}" step="0.5" min="0" max="100" onchange="rebalTargets['${x.nome}']=parseFloat(this.value)||0;renderRebalancingInputs()"></div><div class="rebal-diff ${colorClass(d)}">${d>0?'+':''}${fmt(d)}%</div><div class="rebal-bar"><div class="rebal-bar-fill" style="width:${Math.min(rebalTargets[x.nome],60)/60*100}%;background:${x.cor}"></div></div><div style="font-size:0.8rem;color:var(--text-secondary)">${fmtBRL((rebalTargets[x.nome]/100)*PORTFOLIO.totalBruto)}</div></div>`;}).join('')}<div style="margin-top:8px;font-size:0.8rem;color:var(--text-muted)">Total: <strong class="${Math.abs(total-100)>0.5?'negative':'positive'}">${fmt(total)}%</strong> ${Math.abs(total-100)>0.5?'(deve somar 100%)':'OK'}</div>`;
 }
 
-let rebalanceChartInstance;
 function calculateRebalancing() {
     const total=Object.values(rebalTargets).reduce((s,v)=>s+v,0);
     const rc=document.getElementById('rebalancingResults');
@@ -762,10 +768,10 @@ function resetTargets(){PORTFOLIO.classes.forEach(c=>{rebalTargets[c.nome]=c.alo
 function renderMaturityCalendar() {
     const c=document.getElementById('maturityCalendar');
     const all=[]; PORTFOLIO.classes.filter(x=>!x.estimated).forEach(x=>x.ativos.forEach(a=>{if(a.vencimento)all.push({...a,classe:x.nome,classCor:x.cor});}));
-    all.sort((a,b)=>{const pa=a.vencimento.split('/'),pb=b.vencimento.split('/');return new Date(pa[2]||2026,parseInt(pa[1]||1)-1,parseInt(pa[0]||1))-new Date(pb[2]||2026,parseInt(pb[1]||1)-1,parseInt(pb[0]||1));});
+    all.sort((a,b)=>{const da=parseVencimento(a.vencimento),db=parseVencimento(b.vencimento);return (da||new Date(2099,0,1))-(db||new Date(2099,0,1));});
     if(all.length===0){c.innerHTML='<p style="color:var(--text-muted)">Nenhum ativo com vencimento definido.</p>';return;}
     c.innerHTML=`<div class="table-container"><table><thead><tr><th>Ativo</th><th>Classe</th><th>Vencimento</th><th class="text-right">Saldo Bruto</th><th class="text-right">Alocacao</th><th>Indexador</th><th>Oportunidade</th></tr></thead><tbody>${all.map(a=>{
-        const parts=a.vencimento.split('/');const vd=new Date(parts[2]||2026,parseInt(parts[1]||1)-1,parseInt(parts[0]||1));
+        const vd=parseVencimento(a.vencimento)||new Date(2099,0,1);
         const days=Math.round((vd-new Date(2025,11,31))/(86400000));
         const opp=days<180?'<span class="negative">Vence em breve - planejar reinvestimento</span>':days<365?'<span style="color:var(--accent-yellow)">Vence em menos de 1 ano</span>':'<span style="color:var(--text-muted)">Longo prazo</span>';
         return`<tr><td>${a.nome.substring(0,35)}</td><td><span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:${a.classCor};margin-right:4px"></span>${a.classe}</td><td>${a.vencimento}</td><td class="text-right">${fmtBRL(a.saldoBruto)}</td><td class="text-right">${fmtPct(a.alocacao)}</td><td>${a.indexador||'-'}</td><td>${opp}</td></tr>`;}).join('')}</tbody></table></div>`;
@@ -902,7 +908,8 @@ function parseExcelData(rows,sheetName) {
     PORTFOLIO.totalLiquido=newClasses.reduce((s,c)=>s+c.saldoLiquido,0);
     PORTFOLIO.totalIR=newClasses.reduce((s,c)=>s+c.ir,0);
 
-    // Reset rebal targets
+    // Reset rebal targets (clear old keys first)
+    Object.keys(rebalTargets).forEach(k=>delete rebalTargets[k]);
     PORTFOLIO.classes.forEach(c=>{rebalTargets[c.nome]=c.alocacao;});
 
     // Update strategies targets dynamically
@@ -936,6 +943,7 @@ function rebuildCharts(){
 function rebuildAll(){
     renderKPIs();renderInsights();createAllocationChart();createClassPerformanceChart();createBenchmarkChart();createAlphaChart();
     renderBenchmarkTable();createAssetDetailChart();renderClassTabs();renderAssetsTable();renderRiskMetrics();
+    createCdiCurveChart();renderCdiImpact();
     renderRebalancingInputs();renderStrategyCards();renderMaturityCalendar();
 }
 
